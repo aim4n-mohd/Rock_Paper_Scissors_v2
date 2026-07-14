@@ -48,4 +48,31 @@ describe('game bridge', () => {
     gameBridge.clearInput();
     expect(gameBridge.input).toEqual({ x: 0, y: 0 });
   });
+
+  it('restores the previous live controller when an overlapping controller is released', () => {
+    const firstPause = vi.fn();
+    const secondPause = vi.fn();
+    const releaseFirst = gameBridge.bindController({
+      togglePause: firstPause,
+      restart: vi.fn(),
+      killFaction: vi.fn(),
+    });
+    const releaseSecond = gameBridge.bindController({
+      togglePause: secondPause,
+      restart: vi.fn(),
+      killFaction: vi.fn(),
+    });
+
+    gameBridge.togglePause();
+    expect(secondPause).toHaveBeenCalledOnce();
+    expect(firstPause).not.toHaveBeenCalled();
+
+    releaseSecond();
+    gameBridge.togglePause();
+    expect(firstPause).toHaveBeenCalledOnce();
+
+    releaseFirst();
+    gameBridge.togglePause();
+    expect(firstPause).toHaveBeenCalledOnce();
+  });
 });

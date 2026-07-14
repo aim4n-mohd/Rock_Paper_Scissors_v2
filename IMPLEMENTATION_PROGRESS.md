@@ -23,7 +23,10 @@ Complete — MVP implementation, production validation, and senior-review harden
 - [x] Visual QA — start screen and live meadow inspected at desktop size; canvas, HUD, trees, units, and camera framing rendered cleanly with no console warnings.
 - [x] Review hardening — added independent ally cohesion, fixed-step simulation, long-frame obstacle protection, complete config validation, focus-safe input, renderer failure recovery, direct Phaser factory/scene lifecycle tests, exact Pages-artifact smoke testing, and refreshed documentation.
   - Red proof: seven focused tests failed across AI, simulation, input, configuration, renderer lifecycle, and failure UI before implementation.
-  - Green proof: the expanded 52-test suite passes across 16 files, including previously excluded Phaser integration boundaries.
+- [x] Deployment hardening — cancelled disposed async Phaser startups and made bridge-controller cleanup ownership-safe so React Strict Mode cannot leave CI browser tests connected to a stale game instance.
+  - Red proof: the lifecycle regression failed before implementation, and repeated browser execution reproduced the pause/result race.
+  - Green proof: 20 consecutive browser flows passed after the fix.
+  - The expanded 54-test suite passes across 16 files, including previously excluded Phaser integration boundaries.
 
 ## In progress
 
@@ -35,7 +38,7 @@ Complete — MVP implementation, production validation, and senior-review harden
 
 ## Test status
 
-- Unit/integration/UI: 52 passed across 16 files.
+- Unit/integration/UI: 54 passed across 16 files.
 - Coverage: passing; 94.74% statements/lines across the expanded scope, including Phaser factory and scene code.
 - Browser E2E: 4 passed in Chromium.
 - Production smoke: 1 passed in Chromium for both the root build and the repository-subpath build.

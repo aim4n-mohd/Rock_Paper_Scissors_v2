@@ -15,10 +15,17 @@ interface GameHandle {
   destroy(removeCanvas: boolean): void;
 }
 
-export type GameFactory = (parent: HTMLElement) => Promise<GameHandle>;
+export type GameFactory = (
+  parent: HTMLElement,
+  signal: AbortSignal,
+) => Promise<GameHandle | undefined>;
 
-async function defaultGameFactory(parent: HTMLElement): Promise<GameHandle> {
+async function defaultGameFactory(
+  parent: HTMLElement,
+  signal: AbortSignal,
+): Promise<GameHandle | undefined> {
   const { createGame } = await import('./createGame');
+  if (signal.aborted) return undefined;
   return createGame(parent);
 }
 
@@ -33,9 +40,11 @@ export function GameCanvas({ onError, gameFactory = defaultGameFactory }: GameCa
   useEffect(() => {
     let disposed = false;
     let game: GameHandle | undefined;
+    const startup = new AbortController();
     if (hostRef.current) {
-      void gameFactory(hostRef.current)
+      void gameFactory(hostRef.current, startup.signal)
         .then((createdGame) => {
+          if (!createdGame) return;
           if (disposed) {
             createdGame.destroy(true);
             return;
@@ -56,8 +65,8 @@ export function GameCanvas({ onError, gameFactory = defaultGameFactory }: GameCa
     }
     return () => {
       disposed = true;
+      startup.abort();
       game?.destroy(true);
-      gameBridge.bindController(undefined);
       delete window.__RPS_TEST__;
     };
   }, [gameFactory, onError]);

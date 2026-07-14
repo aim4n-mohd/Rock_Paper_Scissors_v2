@@ -12,7 +12,7 @@ interface GameController {
 class GameBridge {
   private listeners = new Set<SnapshotListener>();
   private pressed = new Set<string>();
-  private controller?: GameController;
+  private controllers: GameController[] = [];
   latest?: GameSnapshot;
 
   subscribe(listener: SnapshotListener): () => void {
@@ -26,8 +26,12 @@ class GameBridge {
     for (const listener of this.listeners) listener(snapshot);
   }
 
-  bindController(controller?: GameController): void {
-    this.controller = controller;
+  bindController(controller: GameController): () => void {
+    this.controllers.push(controller);
+    return () => {
+      const index = this.controllers.lastIndexOf(controller);
+      if (index >= 0) this.controllers.splice(index, 1);
+    };
   }
 
   setKey(key: string, pressed: boolean): void {
@@ -46,14 +50,14 @@ class GameBridge {
 
   togglePause(): void {
     this.clearInput();
-    this.controller?.togglePause();
+    this.controllers[this.controllers.length - 1]?.togglePause();
   }
   restart(): void {
     this.clearInput();
-    this.controller?.restart();
+    this.controllers[this.controllers.length - 1]?.restart();
   }
   killFaction(faction: Faction): void {
-    this.controller?.killFaction(faction);
+    this.controllers[this.controllers.length - 1]?.killFaction(faction);
   }
 
   clearInput(): void {
@@ -63,7 +67,7 @@ class GameBridge {
   reset(): void {
     this.listeners.clear();
     this.clearInput();
-    this.controller = undefined;
+    this.controllers = [];
     this.latest = undefined;
   }
 }

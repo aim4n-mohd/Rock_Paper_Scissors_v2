@@ -21,7 +21,7 @@ export class MeadowScene extends Phaser.Scene {
     this.worldGraphics = this.add.graphics();
     this.actorGraphics = this.add.graphics();
     this.drawWorld();
-    gameBridge.bindController({
+    const releaseController = gameBridge.bindController({
       togglePause: () => {
         this.simulation.togglePaused();
         this.publish();
@@ -35,7 +35,7 @@ export class MeadowScene extends Phaser.Scene {
         this.publish();
       },
     });
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => gameBridge.bindController(undefined));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, releaseController);
     this.publish();
   }
 

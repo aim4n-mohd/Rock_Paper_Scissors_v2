@@ -46,7 +46,15 @@ describe('MeadowScene lifecycle', () => {
     const setBounds = vi.fn();
     const camera = { setBounds, scrollX: 0, scrollY: 0 };
     let shutdown: (() => void) | undefined;
-    const bindController = vi.spyOn(gameBridge, 'bindController');
+    const originalBindController = gameBridge.bindController.bind(gameBridge);
+    const releaseController = vi.fn();
+    vi.spyOn(gameBridge, 'bindController').mockImplementation((controller) => {
+      const release = originalBindController(controller);
+      return () => {
+        releaseController();
+        release();
+      };
+    });
 
     Object.assign(scene, {
       cameras: { main: camera },
@@ -73,6 +81,6 @@ describe('MeadowScene lifecycle', () => {
 
     expect(shutdown).toBeTypeOf('function');
     shutdown?.();
-    expect(bindController).toHaveBeenLastCalledWith(undefined);
+    expect(releaseController).toHaveBeenCalledOnce();
   });
 });
