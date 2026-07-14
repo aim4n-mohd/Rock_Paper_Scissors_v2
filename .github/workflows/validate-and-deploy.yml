@@ -39,6 +39,7 @@ jobs:
       - name: Smoke-test the production Pages artifact
         run: pnpm test:production
         env:
+          VITE_PUBLIC_PATH: /${{ github.event.repository.name }}/
           PRODUCTION_BASE_PATH: /${{ github.event.repository.name }}/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
