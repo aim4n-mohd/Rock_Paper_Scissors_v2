@@ -39,5 +39,17 @@ export function decideIndependentMovement(
       targetId: prey.id,
       direction: normalize(subtract(prey.position, unit.position)),
     };
+  const ally = closestUnit(
+    unit,
+    units,
+    (candidate) => candidate.faction === unit.faction,
+    GAME_CONFIG.units.allyRadius,
+  );
+  if (ally)
+    return {
+      intent: 'cohere',
+      targetId: ally.id,
+      direction: normalize(subtract(ally.position, unit.position)),
+    };
   return { intent: 'wander', direction: normalize(wanderDirection) };
 }

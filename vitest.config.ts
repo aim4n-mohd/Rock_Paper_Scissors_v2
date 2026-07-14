@@ -11,13 +11,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/game/**/*.ts', 'src/ui/**/*.tsx'],
-      exclude: [
-        '**/*.test.*',
-        'src/game/scenes/**',
-        'src/game/createGame.ts',
-        'src/game/model/particle.ts',
-      ],
+      include: ['src/game/**/*.{ts,tsx}', 'src/ui/**/*.tsx'],
+      exclude: ['**/*.test.*', 'src/game/model/particle.ts'],
     },
   },
 });

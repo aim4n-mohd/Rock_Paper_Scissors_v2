@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Complete — MVP implementation and production validation
+Complete — MVP implementation, production validation, and senior-review hardening
 
 ## Completed
 
@@ -21,6 +21,9 @@ Complete — MVP implementation and production validation
 - [x] Phase 5 — Playwright flows for start/movement, pause/time/restart, forced victory, forced defeat, and production-only hook exclusion.
 - [x] Phase 6 — README, balancing guidance, favicon, base-path-safe Vite build, GitHub Pages CI/deploy workflow, and production smoke.
 - [x] Visual QA — start screen and live meadow inspected at desktop size; canvas, HUD, trees, units, and camera framing rendered cleanly with no console warnings.
+- [x] Review hardening — added independent ally cohesion, fixed-step simulation, long-frame obstacle protection, complete config validation, focus-safe input, renderer failure recovery, direct Phaser factory/scene lifecycle tests, exact Pages-artifact smoke testing, and refreshed documentation.
+  - Red proof: seven focused tests failed across AI, simulation, input, configuration, renderer lifecycle, and failure UI before implementation.
+  - Green proof: the expanded 52-test suite passes across 16 files, including previously excluded Phaser integration boundaries.
 
 ## In progress
 
@@ -28,26 +31,27 @@ Complete — MVP implementation and production validation
 
 ## Blocked
 
-- Live public deployment is not attempted because this checkout has no Git remote or configured hosted target.
+- None.
 
 ## Test status
 
-- Unit/integration/UI: 41 passed across 13 files.
-- Coverage: passing; 95%+ statements/lines across included framework-independent core modules.
+- Unit/integration/UI: 52 passed across 16 files.
+- Coverage: passing; 94.74% statements/lines across the expanded scope, including Phaser factory and scene code.
 - Browser E2E: 4 passed in Chromium.
-- Production smoke: 1 passed in Chromium.
+- Production smoke: 1 passed in Chromium for both the root build and the repository-subpath build.
 - Typecheck: passed.
 - Lint: passed with zero warnings.
 - Format check: passed.
 - Root-path production build: passed.
-- GitHub Pages-style subpath build and smoke: passed at `/rpscissors-v2-2/`.
+- GitHub Pages-style subpath build and smoke: passed at `/Rock_Paper_Scissors_v2/`.
 - Visual browser check: passed with no browser console warnings.
 
 ## Deviations
 
 - Browser tests run with one worker because parallel WebGL contexts caused nondeterministic page initialization; serial execution is stable and configured.
-- The MVP remains one map and local-only as required; no broader campaign features from older project notes were imported.
+- The MVP remains one map and client-only as required; no broader campaign features from older project notes were imported.
+- A Git remote is configured. The repository workflow is ready to validate and deploy on `main`, but this local hardening pass does not claim a successful live Pages run or public URL.
 
 ## Next task
 
-- Optional: add a Git remote, enable GitHub Pages, and exercise the included deployment workflow to obtain a live URL.
+- Optional: inspect the next GitHub Actions run and confirm the public GitHub Pages URL after these changes are committed and pushed.

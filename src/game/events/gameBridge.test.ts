@@ -35,4 +35,17 @@ describe('game bridge', () => {
     gameBridge.togglePause();
     expect(togglePause).toHaveBeenCalledOnce();
   });
+
+  it('clears held input when restarting or explicitly losing focus', () => {
+    const restart = vi.fn();
+    gameBridge.bindController({ togglePause: vi.fn(), restart, killFaction: vi.fn() });
+    gameBridge.setKey('d', true);
+    expect(gameBridge.input.x).toBe(1);
+    gameBridge.restart();
+    expect(restart).toHaveBeenCalledOnce();
+    expect(gameBridge.input).toEqual({ x: 0, y: 0 });
+    gameBridge.setKey('w', true);
+    gameBridge.clearInput();
+    expect(gameBridge.input).toEqual({ x: 0, y: 0 });
+  });
 });

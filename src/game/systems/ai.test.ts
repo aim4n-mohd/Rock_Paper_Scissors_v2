@@ -31,4 +31,12 @@ describe('independent AI priority', () => {
       direction: { x: 0, y: 1 },
     });
   });
+
+  it('moves toward a nearby ally before falling back to wandering', () => {
+    const rock = createUnit('rock', 'rock', { x: 0, y: 0 });
+    const ally = createUnit('ally', 'rock', { x: 80, y: 0 });
+    const result = decideIndependentMovement(rock, [rock, ally], { x: 0, y: 1 });
+    expect(result).toMatchObject({ intent: 'cohere', targetId: 'ally' });
+    expect(result.direction.x).toBeGreaterThan(0);
+  });
 });

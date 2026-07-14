@@ -42,6 +42,8 @@ export class Simulation {
   anchorId?: string;
   private seed: number;
   private emittedDeaths = new Set<string>();
+  private accumulatorMs = 0;
+  private simulationMs = 0;
 
   constructor(seed = 1) {
     this.seed = seed;
@@ -53,6 +55,8 @@ export class Simulation {
     this.units = createInitialUnits(seed);
     this.particles = [];
     this.elapsedMs = 0;
+    this.accumulatorMs = 0;
+    this.simulationMs = 0;
     this.status = 'active';
     this.anchorId = this.units.find((unit) => unit.recruited)?.id;
     this.emittedDeaths.clear();
@@ -69,8 +73,24 @@ export class Simulation {
 
   update(deltaMs: number, input: Vector): void {
     if (this.status !== 'active') return;
-    const stepMs = Math.min(Math.max(deltaMs, 0), 1000);
-    this.elapsedMs += stepMs;
+    const acceptedMs = Math.min(Math.max(deltaMs, 0), GAME_CONFIG.simulation.maxFrameMs);
+    this.elapsedMs += acceptedMs;
+    this.accumulatorMs += acceptedMs;
+    while (
+      this.status === 'active' &&
+      this.accumulatorMs + Number.EPSILON >= GAME_CONFIG.simulation.fixedStepMs
+    ) {
+      const stepMs = GAME_CONFIG.simulation.fixedStepMs;
+      this.accumulatorMs -= stepMs;
+      this.simulationMs += stepMs;
+      this.step(stepMs, input);
+    }
+    this.updateParticles(acceptedMs);
+    this.transferAnchorIfNeeded();
+    this.evaluateResult();
+  }
+
+  private step(stepMs: number, input: Vector): void {
     recruitNearbyRocks(this.units);
     const swarm = this.units.filter((unit) => unit.alive && unit.recruited);
     const swarmCenter = average(swarm.map((unit) => unit.position));
@@ -84,7 +104,10 @@ export class Simulation {
         desired = unit.knockback;
       } else if (unit.recruited) {
         unit.intent = 'player';
-        const inputVelocity = scale(normalize(input), GAME_CONFIG.units.speed);
+        const inputVelocity = scale(
+          normalize(input),
+          GAME_CONFIG.units.speed * GAME_CONFIG.swarm.maxInputSpeed,
+        );
         const homePull =
           distance(unit.position, swarmCenter) > GAME_CONFIG.swarm.maxDistance
             ? scale(
@@ -121,7 +144,6 @@ export class Simulation {
     }
     this.resolveCollisions();
     this.emitNewDeaths();
-    this.updateParticles(stepMs);
     this.transferAnchorIfNeeded();
     this.evaluateResult();
   }
@@ -182,7 +204,7 @@ export class Simulation {
         const b = this.units[j]!;
         if (!b.alive || a.faction === b.faction) continue;
         if (distance(a.position, b.position) <= a.radius + b.radius)
-          resolveCombatPair(a, b, this.elapsedMs);
+          resolveCombatPair(a, b, this.simulationMs);
       }
     }
   }
@@ -212,8 +234,11 @@ export class Simulation {
     const seconds = deltaMs / 1000;
     for (const particle of this.particles) {
       particle.position = add(particle.position, scale(particle.velocity, seconds));
-      particle.velocity = scale(particle.velocity, 0.94);
-      particle.remainingMs -= deltaMs;
+      particle.velocity = scale(
+        particle.velocity,
+        Math.pow(0.94, deltaMs / GAME_CONFIG.simulation.fixedStepMs),
+      );
+      particle.remainingMs = Math.max(0, particle.remainingMs - deltaMs);
     }
     this.particles = this.particles.filter((particle) => particle.remainingMs > 0);
   }

@@ -24,6 +24,7 @@ export interface GameConfig {
     maxDistance: number;
     maxInputSpeed: number;
   };
+  simulation: { fixedStepMs: number; maxFrameMs: number };
   particles: { count: number; lifetimeMs: number; speed: number };
   camera: { smoothing: number };
   trees: { radius: number; positions: readonly { x: number; y: number }[] };
@@ -75,6 +76,7 @@ export const GAME_CONFIG: GameConfig = {
   },
   recruitment: { radius: 62 },
   swarm: { cohesion: 0.34, separation: 1.1, maxDistance: 230, maxInputSpeed: 1 },
+  simulation: { fixedStepMs: 1000 / 60, maxFrameMs: 1000 },
   particles: { count: 8, lifetimeMs: 650, speed: 55 },
   camera: { smoothing: 0.09 },
   trees: { radius: 34, positions: TREE_POSITIONS },
@@ -82,23 +84,79 @@ export const GAME_CONFIG: GameConfig = {
 
 export function validateConfig(config: GameConfig): void {
   const positives: [string, number][] = [
+    ['viewport.width', config.viewport.width],
+    ['viewport.height', config.viewport.height],
     ['units.maxHealth', config.units.maxHealth],
     ['units.radius', config.units.radius],
     ['units.speed', config.units.speed],
+    ['units.fleeMultiplier', config.units.fleeMultiplier],
+    ['units.detectionRadius', config.units.detectionRadius],
+    ['units.allyRadius', config.units.allyRadius],
+    ['combat.advantageDamage', config.combat.advantageDamage],
+    ['combat.disadvantageDamage', config.combat.disadvantageDamage],
     ['combat.hitCooldownMs', config.combat.hitCooldownMs],
+    ['combat.knockbackForce', config.combat.knockbackForce],
+    ['combat.knockbackDurationMs', config.combat.knockbackDurationMs],
     ['recruitment.radius', config.recruitment.radius],
+    ['swarm.cohesion', config.swarm.cohesion],
+    ['swarm.separation', config.swarm.separation],
+    ['swarm.maxDistance', config.swarm.maxDistance],
+    ['swarm.maxInputSpeed', config.swarm.maxInputSpeed],
+    ['simulation.fixedStepMs', config.simulation.fixedStepMs],
+    ['simulation.maxFrameMs', config.simulation.maxFrameMs],
+    ['particles.lifetimeMs', config.particles.lifetimeMs],
+    ['particles.speed', config.particles.speed],
+    ['trees.radius', config.trees.radius],
     ['world.width', config.world.width],
     ['world.height', config.world.height],
   ];
   for (const [name, value] of positives) {
     if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be positive.`);
   }
+  if (!Number.isFinite(config.world.padding) || config.world.padding < 0)
+    throw new Error('world.padding must be non-negative.');
+  if (config.world.width < config.viewport.width || config.world.height < config.viewport.height)
+    throw new Error('world dimensions must be at least as large as the viewport.');
+  if (
+    config.world.padding + config.units.radius >= config.world.width / 2 ||
+    config.world.padding + config.units.radius >= config.world.height / 2
+  )
+    throw new Error('world.padding must leave a playable area for units.');
+  if (config.simulation.fixedStepMs > config.simulation.maxFrameMs)
+    throw new Error('simulation.fixedStepMs must not exceed simulation.maxFrameMs.');
   if (config.combat.advantageDamage <= config.combat.disadvantageDamage) {
     throw new Error('combat.advantageDamage must exceed disadvantageDamage.');
   }
   for (const [faction, count] of Object.entries(config.population)) {
     if (!Number.isInteger(count) || count < 0)
       throw new Error(`population.${faction} must be a non-negative integer.`);
+  }
+  if (config.population.rock < 1)
+    throw new Error('population.rock must include at least one initial anchor.');
+  if (!Number.isInteger(config.particles.count) || config.particles.count <= 0)
+    throw new Error('particles.count must be a positive integer.');
+  if (
+    !Number.isFinite(config.camera.smoothing) ||
+    config.camera.smoothing <= 0 ||
+    config.camera.smoothing > 1
+  )
+    throw new Error('camera.smoothing must be greater than 0 and at most 1.');
+  for (const [index, tree] of config.trees.positions.entries()) {
+    const minimum = config.world.padding + config.trees.radius;
+    if (
+      !Number.isFinite(tree.x) ||
+      !Number.isFinite(tree.y) ||
+      tree.x < minimum ||
+      tree.x > config.world.width - minimum ||
+      tree.y < minimum ||
+      tree.y > config.world.height - minimum
+    )
+      throw new Error(`trees.positions[${index}] must be inside the playable boundary.`);
+    for (let other = index + 1; other < config.trees.positions.length; other += 1) {
+      const candidate = config.trees.positions[other]!;
+      if (Math.hypot(candidate.x - tree.x, candidate.y - tree.y) <= config.trees.radius * 2)
+        throw new Error(`trees.positions[${index}] must not overlap another tree.`);
+    }
   }
 }
 

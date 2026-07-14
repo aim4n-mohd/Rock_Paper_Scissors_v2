@@ -19,3 +19,9 @@
 - [x] P5.2 Add restart/resource-cleanup validation.
 - [x] P6.1 Add documentation, static-host configuration, metadata, and CI.
 - [x] P6.2 Run and record the complete final validation matrix.
+- [x] R1.1 Add independent ally cohesion and consume every declared steering control.
+- [x] R1.2 Add fixed-step simulation to prevent long-frame obstacle and combat tunneling.
+- [x] R1.3 Clear held input on restart, pause, focus loss, and teardown; ignore repeated action keys.
+- [x] R1.4 Surface renderer startup failures with an in-app retry path.
+- [x] R1.5 Expand configuration validation and direct Phaser factory/scene lifecycle coverage.
+- [x] R1.6 Smoke-test the exact GitHub Pages artifact before deployment and refresh documentation.

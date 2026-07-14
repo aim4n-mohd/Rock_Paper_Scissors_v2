@@ -45,18 +45,24 @@ class GameBridge {
   }
 
   togglePause(): void {
+    this.clearInput();
     this.controller?.togglePause();
   }
   restart(): void {
+    this.clearInput();
     this.controller?.restart();
   }
   killFaction(faction: Faction): void {
     this.controller?.killFaction(faction);
   }
 
+  clearInput(): void {
+    this.pressed.clear();
+  }
+
   reset(): void {
     this.listeners.clear();
-    this.pressed.clear();
+    this.clearInput();
     this.controller = undefined;
     this.latest = undefined;
   }

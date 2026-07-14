@@ -21,6 +21,8 @@ function timeLabel(elapsedMs: number): string {
 export function App() {
   const [started, setStarted] = useState(false);
   const [snapshot, setSnapshot] = useState(INITIAL_SNAPSHOT);
+  const [gameError, setGameError] = useState<string>();
+  const [gameAttempt, setGameAttempt] = useState(0);
 
   useEffect(() => gameBridge.subscribe(setSnapshot), []);
 
@@ -32,19 +34,28 @@ export function App() {
         event.preventDefault();
         gameBridge.setKey(key, pressed);
       }
-      if (pressed && key === 'escape') {
+      if (pressed && !event.repeat && key === 'escape') {
         event.preventDefault();
         gameBridge.togglePause();
       }
-      if (pressed && key === 'r') gameBridge.restart();
+      if (pressed && !event.repeat && key === 'r') gameBridge.restart();
     };
     const down = (event: KeyboardEvent) => onKey(event, true);
     const up = (event: KeyboardEvent) => onKey(event, false);
+    const clearInput = () => gameBridge.clearInput();
+    const clearHiddenInput = () => {
+      if (document.hidden) clearInput();
+    };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
+    window.addEventListener('blur', clearInput);
+    document.addEventListener('visibilitychange', clearHiddenInput);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', clearInput);
+      document.removeEventListener('visibilitychange', clearHiddenInput);
+      clearInput();
     };
   }, [started]);
 
@@ -52,7 +63,7 @@ export function App() {
     <main className="app-shell">
       <section className="game-frame" aria-label="Rock Paper Scissors game">
         {started ? (
-          <GameCanvas />
+          <GameCanvas key={gameAttempt} onError={setGameError} />
         ) : (
           <div className="meadow-placeholder" data-testid="game-container" />
         )}
@@ -78,12 +89,34 @@ export function App() {
             <h1>Rock, Paper, Scissors v2.2</h1>
             <p>Control Rock. Hunt Scissors. Avoid Paper. Eliminate both factions.</p>
             <p className="controls">Move: WASD / Arrows · Pause: Esc · Restart: R</p>
-            <button type="button" onClick={() => setStarted(true)}>
+            <button
+              type="button"
+              onClick={() => {
+                setGameError(undefined);
+                setStarted(true);
+              }}
+            >
               Start game
             </button>
           </div>
         )}
-        {started && snapshot.status === 'paused' && (
+        {started && gameError && (
+          <div className="overlay compact-overlay" role="alert">
+            <p className="eyebrow">Renderer unavailable</p>
+            <h2>Game could not start</h2>
+            <p>{gameError}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setGameError(undefined);
+                setGameAttempt((attempt) => attempt + 1);
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        )}
+        {started && !gameError && snapshot.status === 'paused' && (
           <div className="overlay compact-overlay">
             <p className="eyebrow">Take a breath</p>
             <h2>Paused</h2>
@@ -93,19 +126,21 @@ export function App() {
             </button>
           </div>
         )}
-        {started && (snapshot.status === 'victory' || snapshot.status === 'defeat') && (
-          <div className="overlay compact-overlay">
-            <p className="eyebrow">Match complete</p>
-            <h2>{snapshot.status === 'victory' ? 'Meadow conquered!' : 'The Rocks are gone'}</h2>
-            <p>
-              Time {timeLabel(snapshot.elapsedMs)} · {snapshot.counts.rock} Rocks ·{' '}
-              {snapshot.counts.paper} Papers · {snapshot.counts.scissors} Scissors
-            </p>
-            <button type="button" onClick={() => gameBridge.restart()}>
-              Play again
-            </button>
-          </div>
-        )}
+        {started &&
+          !gameError &&
+          (snapshot.status === 'victory' || snapshot.status === 'defeat') && (
+            <div className="overlay compact-overlay">
+              <p className="eyebrow">Match complete</p>
+              <h2>{snapshot.status === 'victory' ? 'Meadow conquered!' : 'The Rocks are gone'}</h2>
+              <p>
+                Time {timeLabel(snapshot.elapsedMs)} · {snapshot.counts.rock} Rocks ·{' '}
+                {snapshot.counts.paper} Papers · {snapshot.counts.scissors} Scissors
+              </p>
+              <button type="button" onClick={() => gameBridge.restart()}>
+                Play again
+              </button>
+            </div>
+          )}
       </section>
     </main>
   );

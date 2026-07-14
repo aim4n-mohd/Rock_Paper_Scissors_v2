@@ -1,23 +1,89 @@
 # Rock, Paper, Scissors v2.2
 
-A client-only top-down arcade game built with React, TypeScript, Phaser, and Vite. Lead a Rock swarm, recruit neutral units, defeat Scissors, and avoid Paper.
+A client-only, top-down arcade game built with React, TypeScript, Phaser, and Vite. Lead a loose Rock swarm, recruit neutral Rocks, hunt Scissors, flee Paper, and eliminate both enemy factions.
 
-## Run locally
+## Requirements
 
-Requires Node.js 20+ and pnpm 11.
+- Node.js 20 or newer
+- pnpm 11.7.0 (the repository pins the package-manager version)
+
+## Local development
 
 ```powershell
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Use WASD or the arrow keys to move, Escape to pause, and R to restart.
+Open the local URL printed by Vite.
 
-## Build and test
+Controls:
+
+- WASD or arrow keys: move the recruited Rock swarm
+- Escape: pause or resume
+- R: restart the match
+
+## Validation
+
+Run the same checks used by CI:
 
 ```powershell
 pnpm test
+pnpm test:coverage
+pnpm typecheck
+pnpm lint
+pnpm format:check
+pnpm exec playwright install chromium
+pnpm test:e2e
 pnpm build
+pnpm test:production
 ```
 
-The game runs entirely in the browser and has no backend, accounts, analytics, or cloud services.
+The Vitest suite covers framework-independent gameplay systems, the React shell, Phaser creation, and meadow-scene lifecycle. Playwright covers user-visible browser flows and the built static application.
+
+## Architecture
+
+- `src/game/config`: typed balance values and faction relationships
+- `src/game/model`: framework-independent unit and particle state
+- `src/game/systems`: AI, spawning, recruitment, combat, and spatial rules
+- `src/game/simulation`: fixed-step match simulation and state transitions
+- `src/game/scenes`: Phaser rendering and lifecycle adapter
+- `src/game/events`: bridge between Phaser state and React controls/UI
+- `src/App.tsx`: start, HUD, pause, failure, and result overlays
+- `e2e`: development and production browser tests
+
+Phaser renders the meadow and units. Gameplay rules remain outside Phaser so they can be tested deterministically. React owns the accessible application shell and overlays.
+
+## Balancing
+
+All gameplay tuning lives in `src/game/config/gameConfig.ts`, including population, health, movement, detection, ally cohesion, damage, cooldown, knockback, recruitment, fixed-step timing, particles, camera smoothing, and trees.
+
+`validateConfig` rejects unsafe values during startup. Keep `advantageDamage` greater than `disadvantageDamage`, retain at least one Rock for the initial anchor, and run the complete validation suite after any balance change.
+
+## Production build and deployment
+
+The application builds to `dist` and requires no backend, accounts, analytics, or cloud services.
+
+For a root-hosted static site:
+
+```powershell
+pnpm build
+pnpm test:production
+```
+
+For a subpath such as GitHub Pages, build and smoke-test the same base path:
+
+```powershell
+$env:VITE_PUBLIC_PATH = '/your-repository-name/'
+pnpm build
+$env:PRODUCTION_BASE_PATH = '/your-repository-name/'
+pnpm test:production
+```
+
+The included GitHub Actions workflow performs tests, creates a repository-subpath build, smoke-tests that exact artifact, and then deploys it to GitHub Pages. A successful local build does not by itself prove that Pages is enabled or the remote deployment succeeded; confirm the workflow and public URL in GitHub.
+
+## Project records
+
+- `GAME_CONTEXT.md`: resolved product behavior and scope
+- `BUILD_PLAN.md`: engineering phases and acceptance gates
+- `TASKS.md`: ordered task checklist
+- `IMPLEMENTATION_PROGRESS.md`: current completion and verification evidence

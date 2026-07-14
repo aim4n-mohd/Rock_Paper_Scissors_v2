@@ -3,7 +3,7 @@ import { GAME_CONFIG } from '../config/gameConfig';
 import type { Vector } from '../math/vector';
 import { vec } from '../math/vector';
 
-export type UnitIntent = 'player' | 'wander' | 'chase' | 'flee' | 'dead';
+export type UnitIntent = 'player' | 'wander' | 'chase' | 'flee' | 'cohere' | 'dead';
 
 export interface Unit {
   id: string;

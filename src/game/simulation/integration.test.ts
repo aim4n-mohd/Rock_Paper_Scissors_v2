@@ -25,6 +25,29 @@ describe('simulation integration scenarios', () => {
     );
   });
 
+  it('does not tunnel through a tree during a long frame', () => {
+    const simulation = new Simulation(4);
+    const rock = simulation.units.find((unit) => unit.recruited)!;
+    const tree = GAME_CONFIG.trees.positions[0]!;
+    const minimum = GAME_CONFIG.trees.radius + rock.radius;
+    rock.position = { x: tree.x - 100, y: tree.y };
+    simulation.update(1000, { x: 1, y: 0 });
+    expect(rock.position.x).toBeLessThanOrEqual(tree.x - minimum);
+  });
+
+  it('does not tunnel through an opposing unit during a long frame', () => {
+    const simulation = new Simulation(4);
+    const rock = createUnit('rock', 'rock', { x: 500, y: 500 }, true);
+    const paper = createUnit('paper', 'paper', { x: 650, y: 500 });
+    simulation.units = [rock, paper];
+    simulation.anchorId = rock.id;
+
+    simulation.update(1000, { x: 1, y: 0 });
+
+    expect(rock.health).toBeLessThan(rock.maxHealth);
+    expect(paper.health).toBeLessThan(paper.maxHealth);
+  });
+
   it('emits faction particles once and removes them after their lifetime', () => {
     const simulation = new Simulation(3);
     simulation.killFaction('paper');
