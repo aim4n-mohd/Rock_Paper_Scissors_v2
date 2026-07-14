@@ -1,0 +1,21 @@
+# Ordered Implementation Tasks
+
+- [x] P0.1 Create package, TypeScript, Vite, Vitest, ESLint, Prettier, and Playwright configuration.
+- [x] P0.2 Add React application shell and smoke test.
+- [x] P1.1 Add faction relationship resolver and exhaustive tests.
+- [x] P1.2 Add typed game configuration and validation tests.
+- [x] P1.3 Add vectors, units, registry, seeded random, and spatial query tests.
+- [x] P2.1 Add AI priority and steering tests/implementation.
+- [x] P2.2 Add deterministic spawn and obstacle tests/implementation.
+- [x] P2.3 Add swarm control and recruitment tests/implementation.
+- [x] P2.4 Add combat, cooldown, knockback, health, and death tests/implementation.
+- [x] P2.5 Add anchor transfer, match state, timer, pause, result, and restart tests/implementation.
+- [x] P2.6 Add required simulation integration scenarios.
+- [x] P3.1 Add Phaser lifecycle adapter and meadow rendering.
+- [x] P3.2 Add live units, obstacles, particles, camera, and simulation integration.
+- [x] P4.1 Add start/HUD/pause/result overlays and tests.
+- [x] P4.2 Wire keyboard controls, snapshots, and restart.
+- [x] P5.1 Add Playwright start, movement, pause, restart, victory, and defeat tests.
+- [x] P5.2 Add restart/resource-cleanup validation.
+- [x] P6.1 Add documentation, static-host configuration, metadata, and CI.
+- [x] P6.2 Run and record the complete final validation matrix.
