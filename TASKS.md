@@ -25,3 +25,22 @@
 - [x] R1.4 Surface renderer startup failures with an in-app retry path.
 - [x] R1.5 Expand configuration validation and direct Phaser factory/scene lifecycle coverage.
 - [x] R1.6 Smoke-test the exact GitHub Pages artifact before deployment and refresh documentation.
+
+## Arcade movement and AI steering overhaul
+
+- [x] M1.1 Add typed per-unit motion configuration and validation.
+- [x] M1.2 Add seeded remembered/predicted AI decisions with reaction delay and commitment windows.
+- [x] M1.3 Add acceleration, deceleration, drag, steering-force, and turn-rate integration.
+- [x] M1.4 Move recruited Rocks through an invisible swarm target with deterministic loose offsets.
+- [x] M1.5 Add momentum-aware tree avoidance without live-target path correction.
+- [x] M1.6 Pass targeted tests and the complete validation matrix.
+
+## Display-only minimap
+
+- [x] MM1.1 Add typed minimap configuration and validation.
+- [x] MM1.2 Add reusable world-to-minimap and camera-viewport mapping with clamping and zoom support.
+- [x] MM1.3 Project all living units with recruited, neutral, anchor, faction, and death filtering rules.
+- [x] MM1.4 Add cached static terrain and reusable dynamic marker/viewport graphics layers.
+- [x] MM1.5 Integrate minimap create/update/resize/destroy behavior with `MeadowScene`.
+- [x] MM1.6 Add the central shrine as a visual landmark only, without shrine gameplay or faction switching.
+- [x] MM1.7 Pass focused tests and the complete validation matrix.

@@ -44,8 +44,9 @@ The Vitest suite covers framework-independent gameplay systems, the React shell,
 
 - `src/game/config`: typed balance values and faction relationships
 - `src/game/model`: framework-independent unit and particle state
-- `src/game/systems`: AI, spawning, recruitment, combat, and spatial rules
+- `src/game/systems`: AI selection/memory, arcade steering, spawning, recruitment, combat, and spatial rules
 - `src/game/simulation`: fixed-step match simulation and state transitions
+- `src/game/minimap`: coordinate mapping, live marker projection, and cached Phaser minimap rendering
 - `src/game/scenes`: Phaser rendering and lifecycle adapter
 - `src/game/events`: bridge between Phaser state and React controls/UI
 - `src/App.tsx`: start, HUD, pause, failure, and result overlays
@@ -55,7 +56,9 @@ Phaser renders the meadow and units. Gameplay rules remain outside Phaser so the
 
 ## Balancing
 
-All gameplay tuning lives in `src/game/config/gameConfig.ts`, including population, health, movement, detection, ally cohesion, damage, cooldown, knockback, recruitment, fixed-step timing, particles, camera smoothing, and trees.
+All gameplay tuning lives in `src/game/config/gameConfig.ts`, including population, health, detection, damage, recruitment, fixed-step timing, and per-unit motion. Motion values cover maximum speed, acceleration, deceleration, drag, steering force, turn rate, decision interval, reaction delay, prediction time/error, flee speed, and obstacle avoidance. Swarm configuration controls loose offsets, separation, cohesion, return strength, and the invisible player target.
+
+The same file contains the display-only `minimap` block: enablement, maximum size, margin/padding, opacity, border thicknesses, unit/recruited marker sizes, neutral Rock opacity, and tree/shrine visibility. The shrine is a visual landmark only; it does not add faction switching or other gameplay.
 
 `validateConfig` rejects unsafe values during startup. Keep `advantageDamage` greater than `disadvantageDamage`, retain at least one Rock for the initial anchor, and run the complete validation suite after any balance change.
 

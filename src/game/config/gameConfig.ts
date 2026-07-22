@@ -1,3 +1,36 @@
+export interface UnitMotionConfig {
+  maxSpeed: number;
+  acceleration: number;
+  deceleration: number;
+  drag: number;
+  maxSteeringForce: number;
+  maxTurnRate: number;
+  decisionIntervalMs: number;
+  reactionDelayMs: number;
+  predictionTimeMs: number;
+  predictionError: number;
+  fleeSpeedMultiplier: number;
+  obstacleAvoidanceStrength: number;
+  obstacleLookAhead: number;
+  obstacleSideBias: number;
+}
+
+export interface MinimapConfig {
+  enabled: boolean;
+  width: number;
+  maxHeight: number;
+  margin: number;
+  padding: number;
+  backgroundAlpha: number;
+  borderThickness: number;
+  unitMarkerSize: number;
+  playerMarkerSize: number;
+  neutralMarkerAlpha: number;
+  viewportBorderThickness: number;
+  showTrees: boolean;
+  showShrine: boolean;
+}
+
 export interface GameConfig {
   viewport: { width: number; height: number };
   world: { width: number; height: number; padding: number };
@@ -5,10 +38,9 @@ export interface GameConfig {
   units: {
     maxHealth: number;
     radius: number;
-    speed: number;
-    fleeMultiplier: number;
     detectionRadius: number;
     allyRadius: number;
+    motion: UnitMotionConfig;
   };
   combat: {
     advantageDamage: number;
@@ -21,13 +53,19 @@ export interface GameConfig {
   swarm: {
     cohesion: number;
     separation: number;
+    separationRadius: number;
     maxDistance: number;
     maxInputSpeed: number;
+    offsetRadius: number;
+    arrivalRadius: number;
+    returnStrength: number;
   };
   simulation: { fixedStepMs: number; maxFrameMs: number };
   particles: { count: number; lifetimeMs: number; speed: number };
   camera: { smoothing: number };
   trees: { radius: number; positions: readonly { x: number; y: number }[] };
+  landmarks: { shrine: { x: number; y: number } };
+  minimap: MinimapConfig;
 }
 
 const TREE_POSITIONS = [
@@ -62,10 +100,24 @@ export const GAME_CONFIG: GameConfig = {
   units: {
     maxHealth: 100,
     radius: 10,
-    speed: 105,
-    fleeMultiplier: 1.15,
     detectionRadius: 190,
     allyRadius: 105,
+    motion: {
+      maxSpeed: 112,
+      acceleration: 460,
+      deceleration: 320,
+      drag: 0.55,
+      maxSteeringForce: 520,
+      maxTurnRate: 3.4,
+      decisionIntervalMs: 260,
+      reactionDelayMs: 140,
+      predictionTimeMs: 240,
+      predictionError: 38,
+      fleeSpeedMultiplier: 1.12,
+      obstacleAvoidanceStrength: 4.6,
+      obstacleLookAhead: 62,
+      obstacleSideBias: 0.72,
+    },
   },
   combat: {
     advantageDamage: 35,
@@ -75,11 +127,36 @@ export const GAME_CONFIG: GameConfig = {
     knockbackDurationMs: 140,
   },
   recruitment: { radius: 62 },
-  swarm: { cohesion: 0.34, separation: 1.1, maxDistance: 230, maxInputSpeed: 1 },
+  swarm: {
+    cohesion: 0.34,
+    separation: 1.1,
+    separationRadius: 34,
+    maxDistance: 230,
+    maxInputSpeed: 1,
+    offsetRadius: 52,
+    arrivalRadius: 14,
+    returnStrength: 2.2,
+  },
   simulation: { fixedStepMs: 1000 / 60, maxFrameMs: 1000 },
   particles: { count: 8, lifetimeMs: 650, speed: 55 },
   camera: { smoothing: 0.09 },
   trees: { radius: 34, positions: TREE_POSITIONS },
+  landmarks: { shrine: { x: 1440, y: 810 } },
+  minimap: {
+    enabled: true,
+    width: 180,
+    maxHeight: 130,
+    margin: 12,
+    padding: 5,
+    backgroundAlpha: 0.75,
+    borderThickness: 2,
+    unitMarkerSize: 3,
+    playerMarkerSize: 5,
+    neutralMarkerAlpha: 0.55,
+    viewportBorderThickness: 1,
+    showTrees: true,
+    showShrine: true,
+  },
 };
 
 export function validateConfig(config: GameConfig): void {
@@ -88,10 +165,18 @@ export function validateConfig(config: GameConfig): void {
     ['viewport.height', config.viewport.height],
     ['units.maxHealth', config.units.maxHealth],
     ['units.radius', config.units.radius],
-    ['units.speed', config.units.speed],
-    ['units.fleeMultiplier', config.units.fleeMultiplier],
     ['units.detectionRadius', config.units.detectionRadius],
     ['units.allyRadius', config.units.allyRadius],
+    ['units.motion.maxSpeed', config.units.motion.maxSpeed],
+    ['units.motion.acceleration', config.units.motion.acceleration],
+    ['units.motion.deceleration', config.units.motion.deceleration],
+    ['units.motion.maxSteeringForce', config.units.motion.maxSteeringForce],
+    ['units.motion.maxTurnRate', config.units.motion.maxTurnRate],
+    ['units.motion.decisionIntervalMs', config.units.motion.decisionIntervalMs],
+    ['units.motion.fleeSpeedMultiplier', config.units.motion.fleeSpeedMultiplier],
+    ['units.motion.obstacleAvoidanceStrength', config.units.motion.obstacleAvoidanceStrength],
+    ['units.motion.obstacleLookAhead', config.units.motion.obstacleLookAhead],
+    ['units.motion.obstacleSideBias', config.units.motion.obstacleSideBias],
     ['combat.advantageDamage', config.combat.advantageDamage],
     ['combat.disadvantageDamage', config.combat.disadvantageDamage],
     ['combat.hitCooldownMs', config.combat.hitCooldownMs],
@@ -100,8 +185,12 @@ export function validateConfig(config: GameConfig): void {
     ['recruitment.radius', config.recruitment.radius],
     ['swarm.cohesion', config.swarm.cohesion],
     ['swarm.separation', config.swarm.separation],
+    ['swarm.separationRadius', config.swarm.separationRadius],
     ['swarm.maxDistance', config.swarm.maxDistance],
     ['swarm.maxInputSpeed', config.swarm.maxInputSpeed],
+    ['swarm.offsetRadius', config.swarm.offsetRadius],
+    ['swarm.arrivalRadius', config.swarm.arrivalRadius],
+    ['swarm.returnStrength', config.swarm.returnStrength],
     ['simulation.fixedStepMs', config.simulation.fixedStepMs],
     ['simulation.maxFrameMs', config.simulation.maxFrameMs],
     ['particles.lifetimeMs', config.particles.lifetimeMs],
@@ -109,12 +198,45 @@ export function validateConfig(config: GameConfig): void {
     ['trees.radius', config.trees.radius],
     ['world.width', config.world.width],
     ['world.height', config.world.height],
+    ['minimap.width', config.minimap.width],
+    ['minimap.maxHeight', config.minimap.maxHeight],
+    ['minimap.borderThickness', config.minimap.borderThickness],
+    ['minimap.unitMarkerSize', config.minimap.unitMarkerSize],
+    ['minimap.playerMarkerSize', config.minimap.playerMarkerSize],
+    ['minimap.viewportBorderThickness', config.minimap.viewportBorderThickness],
   ];
   for (const [name, value] of positives) {
     if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be positive.`);
   }
   if (!Number.isFinite(config.world.padding) || config.world.padding < 0)
     throw new Error('world.padding must be non-negative.');
+  for (const [name, value] of [
+    ['minimap.margin', config.minimap.margin],
+    ['minimap.padding', config.minimap.padding],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be non-negative.`);
+  }
+  for (const [name, value] of [
+    ['minimap.backgroundAlpha', config.minimap.backgroundAlpha],
+    ['minimap.neutralMarkerAlpha', config.minimap.neutralMarkerAlpha],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0 || value > 1)
+      throw new Error(`${name} must be between 0 and 1.`);
+  }
+  if (config.minimap.padding * 2 >= config.minimap.width)
+    throw new Error('minimap.padding must leave positive drawing width.');
+  if (config.minimap.padding * 2 >= config.minimap.maxHeight)
+    throw new Error('minimap.padding must leave positive drawing height.');
+  for (const [name, value] of [
+    ['units.motion.drag', config.units.motion.drag],
+    ['units.motion.reactionDelayMs', config.units.motion.reactionDelayMs],
+    ['units.motion.predictionTimeMs', config.units.motion.predictionTimeMs],
+    ['units.motion.predictionError', config.units.motion.predictionError],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be non-negative.`);
+  }
+  if (config.units.motion.reactionDelayMs > config.units.motion.decisionIntervalMs)
+    throw new Error('units.motion.reactionDelayMs must not exceed decisionIntervalMs.');
   if (config.world.width < config.viewport.width || config.world.height < config.viewport.height)
     throw new Error('world dimensions must be at least as large as the viewport.');
   if (
@@ -158,6 +280,16 @@ export function validateConfig(config: GameConfig): void {
         throw new Error(`trees.positions[${index}] must not overlap another tree.`);
     }
   }
+  const shrine = config.landmarks.shrine;
+  if (
+    !Number.isFinite(shrine.x) ||
+    !Number.isFinite(shrine.y) ||
+    shrine.x < 0 ||
+    shrine.y < 0 ||
+    shrine.x > config.world.width ||
+    shrine.y > config.world.height
+  )
+    throw new Error('landmarks.shrine must be inside the world boundary.');
 }
 
 validateConfig(GAME_CONFIG);

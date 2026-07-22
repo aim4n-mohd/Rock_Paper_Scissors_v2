@@ -41,6 +41,54 @@ describe('game configuration', () => {
         trees: { ...GAME_CONFIG.trees, positions: [{ x: 0, y: 0 }] },
       }),
     ).toThrow(/trees.positions/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        units: {
+          ...GAME_CONFIG.units,
+          motion: { ...GAME_CONFIG.units.motion, maxTurnRate: 0 },
+        },
+      }),
+    ).toThrow(/maxTurnRate/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        units: {
+          ...GAME_CONFIG.units,
+          motion: {
+            ...GAME_CONFIG.units.motion,
+            reactionDelayMs: GAME_CONFIG.units.motion.decisionIntervalMs + 1,
+          },
+        },
+      }),
+    ).toThrow(/reactionDelayMs/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        units: {
+          ...GAME_CONFIG.units,
+          motion: { ...GAME_CONFIG.units.motion, predictionError: -1 },
+        },
+      }),
+    ).toThrow(/predictionError/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        minimap: { ...GAME_CONFIG.minimap, width: 0 },
+      }),
+    ).toThrow(/minimap.width/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        minimap: { ...GAME_CONFIG.minimap, neutralMarkerAlpha: 1.1 },
+      }),
+    ).toThrow(/neutralMarkerAlpha/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        landmarks: { shrine: { x: GAME_CONFIG.world.width + 1, y: 0 } },
+      }),
+    ).toThrow(/landmarks.shrine/);
   });
 
   it('keeps the fixed meadow trees inside the playable boundary without overlap', () => {

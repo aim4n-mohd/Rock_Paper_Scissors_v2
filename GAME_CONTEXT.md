@@ -32,7 +32,9 @@ Every independent unit prioritizes:
 3. Maintain loose cohesion and separation with allies.
 4. Wander.
 
-Recruited Rocks are different: player input is dominant, tree avoidance and swarm cohesion preserve a loose chaotic crowd, and prey attraction is weak enough that Rocks never chase Scissors far away.
+Independent units sample this priority periodically rather than tracking live targets every frame. A decision is applied only after the configured reaction delay, then remains committed until a later decision is ready. Chase and flee steering use a remembered predicted position with deterministic seeded error, so targets can reverse, juke, hide movement behind trees, and cause overshoot.
+
+All units accelerate toward desired movement, retain momentum, decelerate under drag, and obey steering-force and turn-rate limits. Recruited Rocks are different: player input advances an invisible swarm target, while individual Rocks accelerate toward deterministic loose offsets with separation, cohesion, and obstacle avoidance. Player input stays dominant, but Rocks do not share identical velocity.
 
 ## Combat
 
@@ -64,6 +66,8 @@ Every balance value belongs in typed centralized configuration.
 - Fixed population; no respawning or reinforcements.
 - Initial configurable population: 15 Rocks total, 12 Papers, 16 Scissors.
 - Camera smoothly follows the recruited swarm/main cluster and remains within world bounds.
+- A compact display-only minimap stays in the bottom-left, shows the complete world population, distinguishes the recruited swarm and neutral Rocks, and outlines the current camera viewport.
+- Minimap terrain is intentionally abstract: meadow background, tree dots, and one central visual shrine landmark. The shrine has no collision, interaction, faction-switching, or other gameplay behavior.
 
 ## Controls and interface
 
@@ -77,12 +81,13 @@ Every balance value belongs in typed centralized configuration.
 
 ## MVP exclusions
 
-No additional factions, playable Paper/Scissors, faction switching, levels, campaign, upgrades, bosses, shrines, resources, abilities, dash, multiplayer, save system, mobile controls, procedural maps, monetization, analytics, accounts, backend, or cloud features.
+No additional factions, playable Paper/Scissors, faction switching, levels, campaign, upgrades, bosses, interactive shrines, resources, abilities, dash, multiplayer, save system, mobile controls, procedural maps, monetization, analytics, accounts, backend, or cloud features.
 
 ## Technical direction
 
 - React + TypeScript + Vite provide the application shell and overlays.
 - Phaser owns live rendering and scene lifecycle.
 - Framework-independent TypeScript systems own faction rules, AI decisions, steering, recruitment, combat, health, match state, and deterministic spawning so they can be unit tested.
+- The fixed-step simulation owns persistent per-unit AI memory and motion state; seeded randomness makes prediction error, wandering, and swarm offsets repeatable in tests.
 - Vitest covers unit/integration logic; React Testing Library covers UI; Playwright covers browser flows.
 - Static production output must run without a backend.

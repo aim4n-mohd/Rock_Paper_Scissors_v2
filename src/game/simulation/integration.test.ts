@@ -25,14 +25,19 @@ describe('simulation integration scenarios', () => {
     );
   });
 
-  it('does not tunnel through a tree during a long frame', () => {
+  it('does not enter a tree collider while steering around it over a long frame', () => {
     const simulation = new Simulation(4);
     const rock = simulation.units.find((unit) => unit.recruited)!;
     const tree = GAME_CONFIG.trees.positions[0]!;
     const minimum = GAME_CONFIG.trees.radius + rock.radius;
     rock.position = { x: tree.x - 100, y: tree.y };
-    simulation.update(1000, { x: 1, y: 0 });
-    expect(rock.position.x).toBeLessThanOrEqual(tree.x - minimum);
+    let closestDistance = distance(rock.position, tree);
+    for (let frame = 0; frame < 60; frame += 1) {
+      simulation.update(GAME_CONFIG.simulation.fixedStepMs, { x: 1, y: 0 });
+      closestDistance = Math.min(closestDistance, distance(rock.position, tree));
+    }
+    expect(closestDistance).toBeGreaterThanOrEqual(minimum - 0.001);
+    expect(Math.abs(rock.position.y - tree.y)).toBeGreaterThan(1);
   });
 
   it('does not tunnel through an opposing unit during a long frame', () => {

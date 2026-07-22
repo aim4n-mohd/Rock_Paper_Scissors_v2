@@ -46,12 +46,29 @@ Add README, balancing guide, exact commands, static-host notes, favicon/metadata
 
 Final gate: unit/integration/UI tests, browser tests, coverage, typecheck, lint, format check, production build, and static production smoke all pass. A public deployment is outside completion unless a remote/host is available and exercised.
 
+## Phase 7 — Arcade movement and imperfect steering
+
+Replace direct velocity assignment and frame-perfect target tracking with persistent per-unit motion and AI memory. Add config-driven maximum speed, acceleration, deceleration, drag, steering force, turn rate, decision interval, reaction delay, prediction time/error, flee multiplier, and obstacle avoidance. Independent AI must preserve flee, chase, cohesion, and wander priority while pursuing remembered predicted positions. Recruited Rocks must follow an invisible player-driven swarm target through deterministic loose offsets rather than synchronized velocity.
+
+Tests: same-frame target turns do not alter active pursuit; decisions apply after reaction delay; acceleration and steering force limit velocity changes; turn rate is bounded; drag slows released movement; pursuit can overshoot; flee priority remains intact; seeded prediction is repeatable; player Rocks respond promptly but move differently; tree routing never grants live target tracking or enters solid colliders.
+
+Gate: focused movement tests and the full existing suite pass before production/browser validation is rerun.
+
+## Phase 8 — Display-only minimap
+
+Add a compact bottom-left minimap that derives unit markers from the authoritative simulation and its viewport rectangle from the live Phaser camera. Keep coordinate mapping, marker projection, and Phaser rendering separated. Cache the background, border, trees, and visual shrine landmark on a static graphics layer; reuse one dynamic graphics layer for living-unit markers and the viewport. Preserve world aspect ratio, clamp all projected geometry, support camera zoom, redraw static content only after a canvas-size change, and destroy both layers with the scene.
+
+Tests: nonzero-origin coordinate mapping; out-of-bounds clamping; aspect-preserving layout; camera zoom and edge clamping; all-faction living markers; dead-unit exclusion; recruited/neutral/anchor styling; live faction changes; static-render reuse; restart marker replacement; resize; disable configuration; and scene teardown.
+
+Gate: focused minimap tests, the complete suite, coverage, typecheck, lint, format, root/subpath builds, regular browser flows, and production smoke all pass.
+
 ## Architecture boundaries
 
 - `src/game/config`: all tunable values and faction tables.
 - `src/game/model`: framework-independent state.
 - `src/game/systems`: pure or deterministic simulation behavior.
 - `src/game/scenes`: Phaser adapter and rendering only.
+- `src/game/minimap`: pure projection/model logic plus the fixed-screen Phaser minimap adapter.
 - `src/game/events`: typed bridge snapshots/events.
 - `src/ui`: React overlays and HUD.
 - `src/test`: fixtures and deterministic test helpers.

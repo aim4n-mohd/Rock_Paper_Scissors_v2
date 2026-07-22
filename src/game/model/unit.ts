@@ -1,15 +1,30 @@
 import type { Faction } from '../config/factions';
-import { GAME_CONFIG } from '../config/gameConfig';
+import { GAME_CONFIG, type UnitMotionConfig } from '../config/gameConfig';
 import type { Vector } from '../math/vector';
 import { vec } from '../math/vector';
 
 export type UnitIntent = 'player' | 'wander' | 'chase' | 'flee' | 'cohere' | 'dead';
+
+export interface RememberedDecision {
+  intent: Exclude<UnitIntent, 'player' | 'dead'>;
+  direction: Vector;
+  targetId?: string;
+  targetPosition?: Vector;
+}
+
+export interface AiMemory {
+  active?: RememberedDecision;
+  pending?: { decision: RememberedDecision; applyAtMs: number };
+  nextDecisionAtMs: number;
+  sequence: number;
+}
 
 export interface Unit {
   id: string;
   faction: Faction;
   position: Vector;
   velocity: Vector;
+  motion: UnitMotionConfig;
   health: number;
   maxHealth: number;
   radius: number;
@@ -21,6 +36,9 @@ export interface Unit {
   knockback: Vector;
   knockbackRemainingMs: number;
   flashRemainingMs: number;
+  aiMemory: AiMemory;
+  swarmOffset: Vector;
+  swarmOffsetAssigned: boolean;
 }
 
 export function createUnit(
@@ -34,6 +52,7 @@ export function createUnit(
     faction,
     position: { ...position },
     velocity: vec(),
+    motion: { ...GAME_CONFIG.units.motion },
     health: GAME_CONFIG.units.maxHealth,
     maxHealth: GAME_CONFIG.units.maxHealth,
     radius: GAME_CONFIG.units.radius,
@@ -44,6 +63,9 @@ export function createUnit(
     knockback: vec(),
     knockbackRemainingMs: 0,
     flashRemainingMs: 0,
+    aiMemory: { nextDecisionAtMs: 0, sequence: 0 },
+    swarmOffset: vec(),
+    swarmOffsetAssigned: false,
   };
 }
 

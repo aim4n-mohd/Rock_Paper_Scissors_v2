@@ -1,15 +1,8 @@
 import { FACTIONS, type Faction } from '../config/factions';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { distance, type Vector } from '../math/vector';
+import { createSeededRandom } from '../math/random';
 import { createUnit, type Unit } from '../model/unit';
-
-function seeded(seed: number): () => number {
-  let state = seed >>> 0 || 1;
-  return () => {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    return state / 0x100000000;
-  };
-}
 
 function validPosition(position: Vector, units: readonly Unit[]): boolean {
   const { padding } = GAME_CONFIG.world;
@@ -32,7 +25,7 @@ function validPosition(position: Vector, units: readonly Unit[]): boolean {
 }
 
 export function createInitialUnits(seed = 1): Unit[] {
-  const random = seeded(seed);
+  const random = createSeededRandom(seed);
   const units: Unit[] = [];
   const anchorPosition = { x: GAME_CONFIG.world.width / 2, y: GAME_CONFIG.world.height / 2 };
   units.push(createUnit('rock-0', 'rock', anchorPosition, true));

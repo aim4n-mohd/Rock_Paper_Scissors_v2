@@ -3,20 +3,23 @@ import { GAME_CONFIG } from '../config/gameConfig';
 import {
   add,
   average,
-  clampMagnitude,
   distance,
+  dot,
+  magnitude,
   normalize,
   scale,
   subtract,
   vec,
   type Vector,
 } from '../math/vector';
+import { seededValue } from '../math/random';
 import type { Particle } from '../model/particle';
 import type { Unit } from '../model/unit';
-import { decideIndependentMovement } from '../systems/ai';
+import { updateAiSteering } from '../systems/aiMemory';
 import { resolveCombatPair } from '../systems/combat';
 import { recruitNearbyRocks } from '../systems/recruitment';
 import { createInitialUnits } from '../systems/spawn';
+import { steerVelocity } from '../systems/steering';
 
 export type MatchStatus = 'active' | 'paused' | 'victory' | 'defeat';
 export interface GameSnapshot {
@@ -44,6 +47,7 @@ export class Simulation {
   private emittedDeaths = new Set<string>();
   private accumulatorMs = 0;
   private simulationMs = 0;
+  private playerTarget = vec();
 
   constructor(seed = 1) {
     this.seed = seed;
@@ -59,6 +63,9 @@ export class Simulation {
     this.simulationMs = 0;
     this.status = 'active';
     this.anchorId = this.units.find((unit) => unit.recruited)?.id;
+    this.playerTarget = this.units.find((unit) => unit.id === this.anchorId)?.position ?? vec();
+    for (const unit of this.units.filter((candidate) => candidate.recruited))
+      this.assignSwarmOffset(unit);
     this.emittedDeaths.clear();
   }
 
@@ -91,49 +98,52 @@ export class Simulation {
   }
 
   private step(stepMs: number, input: Vector): void {
-    recruitNearbyRocks(this.units);
+    const joined = recruitNearbyRocks(this.units);
+    for (const id of joined) {
+      const unit = this.units.find((candidate) => candidate.id === id);
+      if (unit) this.assignSwarmOffset(unit);
+    }
     const swarm = this.units.filter((unit) => unit.alive && unit.recruited);
     const swarmCenter = average(swarm.map((unit) => unit.position));
+    this.updatePlayerTarget(input, swarmCenter, stepMs);
 
     for (const unit of this.units) {
       if (!unit.alive) continue;
       unit.flashRemainingMs = Math.max(0, unit.flashRemainingMs - stepMs);
       let desired: Vector;
+      let maximumSpeed = unit.motion.maxSpeed;
       if (unit.knockbackRemainingMs > 0) {
         unit.knockbackRemainingMs = Math.max(0, unit.knockbackRemainingMs - stepMs);
-        desired = unit.knockback;
+        desired = normalize(unit.knockback);
+        maximumSpeed = Math.max(maximumSpeed, magnitude(unit.knockback));
       } else if (unit.recruited) {
+        if (!unit.swarmOffsetAssigned) this.assignSwarmOffset(unit);
         unit.intent = 'player';
-        const inputVelocity = scale(
-          normalize(input),
-          GAME_CONFIG.units.speed * GAME_CONFIG.swarm.maxInputSpeed,
-        );
-        const homePull =
-          distance(unit.position, swarmCenter) > GAME_CONFIG.swarm.maxDistance
-            ? scale(
-                normalize(subtract(swarmCenter, unit.position)),
-                GAME_CONFIG.units.speed * GAME_CONFIG.swarm.cohesion,
-              )
+        const slot = add(this.playerTarget, unit.swarmOffset);
+        const toSlot = subtract(slot, unit.position);
+        const slotPull =
+          magnitude(toSlot) > GAME_CONFIG.swarm.arrivalRadius
+            ? scale(normalize(toSlot), GAME_CONFIG.swarm.cohesion)
             : vec();
-        desired = add(inputVelocity, homePull);
+        desired = add(scale(normalize(input), GAME_CONFIG.swarm.maxInputSpeed), slotPull);
+        if (distance(unit.position, swarmCenter) > GAME_CONFIG.swarm.maxDistance)
+          desired = add(
+            desired,
+            scale(
+              normalize(subtract(swarmCenter, unit.position)),
+              GAME_CONFIG.swarm.returnStrength,
+            ),
+          );
       } else {
-        const angle = idAngle(unit.id, this.elapsedMs);
-        const decision = decideIndependentMovement(unit, this.units, {
-          x: Math.cos(angle),
-          y: Math.sin(angle),
-        });
+        const decision = updateAiSteering(unit, this.units, this.simulationMs, this.seed);
         unit.intent = decision.intent;
         unit.targetId = decision.targetId;
-        const multiplier = decision.intent === 'flee' ? GAME_CONFIG.units.fleeMultiplier : 1;
-        desired = scale(decision.direction, GAME_CONFIG.units.speed * multiplier);
+        desired = decision.direction;
+        if (decision.intent === 'flee') maximumSpeed *= unit.motion.fleeSpeedMultiplier;
       }
       desired = add(desired, this.separationFor(unit));
-      desired = add(desired, this.treeAvoidanceFor(unit));
-      unit.velocity = clampMagnitude(
-        desired,
-        GAME_CONFIG.units.speed *
-          (unit.intent === 'flee' ? GAME_CONFIG.units.fleeMultiplier : 1.35),
-      );
+      desired = add(desired, this.treeAvoidanceFor(unit, desired));
+      unit.velocity = steerVelocity(unit.velocity, desired, maximumSpeed, stepMs, unit.motion);
     }
 
     const seconds = stepMs / 1000;
@@ -153,12 +163,12 @@ export class Simulation {
     for (const ally of this.units) {
       if (ally === unit || !ally.alive || ally.faction !== unit.faction) continue;
       const gap = distance(unit.position, ally.position);
-      if (gap > 0 && gap < unit.radius * 3.2) {
+      if (gap > 0 && gap < GAME_CONFIG.swarm.separationRadius) {
         force = add(
           force,
           scale(
             normalize(subtract(unit.position, ally.position)),
-            (unit.radius * 3.2 - gap) * GAME_CONFIG.swarm.separation,
+            (1 - gap / GAME_CONFIG.swarm.separationRadius) * GAME_CONFIG.swarm.separation,
           ),
         );
       }
@@ -166,32 +176,86 @@ export class Simulation {
     return force;
   }
 
-  private treeAvoidanceFor(unit: Unit): Vector {
+  private treeAvoidanceFor(unit: Unit, preferredDirection: Vector): Vector {
     let force = vec();
-    for (const tree of GAME_CONFIG.trees.positions) {
-      const gap = distance(unit.position, tree);
-      const avoidDistance = GAME_CONFIG.trees.radius + unit.radius + 28;
-      if (gap < avoidDistance)
+    const heading =
+      magnitude(unit.velocity) > 1 ? normalize(unit.velocity) : normalize(preferredDirection);
+    if (magnitude(heading) === 0) return force;
+    const lookAhead = add(unit.position, scale(heading, unit.motion.obstacleLookAhead));
+    for (const [index, tree] of GAME_CONFIG.trees.positions.entries()) {
+      const avoidDistance = GAME_CONFIG.trees.radius + unit.radius;
+      const gap = distance(lookAhead, tree);
+      if (gap < avoidDistance) {
+        const proximity = 1 - gap / avoidDistance;
+        const away = normalize(subtract(lookAhead, tree));
+        const side = seededValue(this.seed, `${unit.id}:tree:${index}`) < 0.5 ? -1 : 1;
+        const tangent = { x: -heading.y * side, y: heading.x * side };
+        const avoidance = add(away, scale(tangent, unit.motion.obstacleSideBias));
         force = add(
           force,
-          scale(normalize(subtract(unit.position, tree)), (avoidDistance - gap) * 7),
+          scale(normalize(avoidance), unit.motion.obstacleAvoidanceStrength * proximity),
         );
+      }
     }
     return force;
+  }
+
+  private assignSwarmOffset(unit: Unit): void {
+    if (unit.id === this.anchorId) {
+      unit.swarmOffset = vec();
+    } else {
+      const angle = seededValue(this.seed, `${unit.id}:swarm-angle`) * Math.PI * 2;
+      const radius =
+        Math.sqrt(seededValue(this.seed, `${unit.id}:swarm-radius`)) *
+        GAME_CONFIG.swarm.offsetRadius;
+      unit.swarmOffset = { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+    }
+    unit.swarmOffsetAssigned = true;
+  }
+
+  private updatePlayerTarget(input: Vector, swarmCenter: Vector, stepMs: number): void {
+    const separation = distance(this.playerTarget, swarmCenter);
+    if (separation > GAME_CONFIG.swarm.maxDistance)
+      this.playerTarget = add(
+        swarmCenter,
+        scale(normalize(subtract(this.playerTarget, swarmCenter)), GAME_CONFIG.swarm.maxDistance),
+      );
+    this.playerTarget = add(
+      this.playerTarget,
+      scale(
+        normalize(input),
+        GAME_CONFIG.units.motion.maxSpeed * GAME_CONFIG.swarm.maxInputSpeed * (stepMs / 1000),
+      ),
+    );
+    const min = GAME_CONFIG.world.padding + GAME_CONFIG.units.radius;
+    this.playerTarget.x = Math.min(
+      GAME_CONFIG.world.width - min,
+      Math.max(min, this.playerTarget.x),
+    );
+    this.playerTarget.y = Math.min(
+      GAME_CONFIG.world.height - min,
+      Math.max(min, this.playerTarget.y),
+    );
   }
 
   private constrainUnit(unit: Unit): void {
     const min = GAME_CONFIG.world.padding + unit.radius;
     const maxX = GAME_CONFIG.world.width - GAME_CONFIG.world.padding - unit.radius;
     const maxY = GAME_CONFIG.world.height - GAME_CONFIG.world.padding - unit.radius;
-    unit.position.x = Math.min(maxX, Math.max(min, unit.position.x));
-    unit.position.y = Math.min(maxY, Math.max(min, unit.position.y));
+    const clampedX = Math.min(maxX, Math.max(min, unit.position.x));
+    const clampedY = Math.min(maxY, Math.max(min, unit.position.y));
+    if (clampedX !== unit.position.x) unit.velocity.x = 0;
+    if (clampedY !== unit.position.y) unit.velocity.y = 0;
+    unit.position.x = clampedX;
+    unit.position.y = clampedY;
     for (const tree of GAME_CONFIG.trees.positions) {
       const minimum = GAME_CONFIG.trees.radius + unit.radius;
       const gap = distance(unit.position, tree);
       if (gap < minimum) {
         const away = gap === 0 ? { x: 1, y: 0 } : normalize(subtract(unit.position, tree));
         unit.position = add(tree, scale(away, minimum));
+        const inwardSpeed = dot(unit.velocity, away);
+        if (inwardSpeed < 0) unit.velocity = subtract(unit.velocity, scale(away, inwardSpeed));
       }
     }
   }

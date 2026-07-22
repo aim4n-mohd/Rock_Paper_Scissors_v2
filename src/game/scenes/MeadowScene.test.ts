@@ -30,6 +30,9 @@ function graphicsDouble() {
     'strokeCircle',
     'fillRoundedRect',
     'lineBetween',
+    'setDepth',
+    'setScrollFactor',
+    'destroy',
   ]) {
     graphics[method] = vi.fn(() => graphics);
   }
@@ -43,8 +46,10 @@ describe('MeadowScene lifecycle', () => {
     const scene = new MeadowScene();
     const worldGraphics = graphicsDouble();
     const actorGraphics = graphicsDouble();
+    const minimapStaticGraphics = graphicsDouble();
+    const minimapDynamicGraphics = graphicsDouble();
     const setBounds = vi.fn();
-    const camera = { setBounds, scrollX: 0, scrollY: 0 };
+    const camera = { setBounds, scrollX: 0, scrollY: 0, zoom: 1 };
     let shutdown: (() => void) | undefined;
     const originalBindController = gameBridge.bindController.bind(gameBridge);
     const releaseController = vi.fn();
@@ -60,7 +65,12 @@ describe('MeadowScene lifecycle', () => {
       cameras: { main: camera },
       scale: { width: GAME_CONFIG.viewport.width, height: GAME_CONFIG.viewport.height },
       add: {
-        graphics: vi.fn().mockReturnValueOnce(worldGraphics).mockReturnValueOnce(actorGraphics),
+        graphics: vi
+          .fn()
+          .mockReturnValueOnce(worldGraphics)
+          .mockReturnValueOnce(actorGraphics)
+          .mockReturnValueOnce(minimapStaticGraphics)
+          .mockReturnValueOnce(minimapDynamicGraphics),
       },
       events: {
         once: vi.fn((event: string, callback: () => void) => {
@@ -75,6 +85,7 @@ describe('MeadowScene lifecycle', () => {
 
     scene.update(0, 100);
     expect(actorGraphics.clear).toHaveBeenCalled();
+    expect(minimapDynamicGraphics.clear).toHaveBeenCalled();
     expect(gameBridge.latest?.elapsedMs).toBe(100);
     expect(Number.isFinite(camera.scrollX)).toBe(true);
     expect(Number.isFinite(camera.scrollY)).toBe(true);
@@ -82,5 +93,7 @@ describe('MeadowScene lifecycle', () => {
     expect(shutdown).toBeTypeOf('function');
     shutdown?.();
     expect(releaseController).toHaveBeenCalledOnce();
+    expect(minimapStaticGraphics.destroy).toHaveBeenCalledOnce();
+    expect(minimapDynamicGraphics.destroy).toHaveBeenCalledOnce();
   });
 });

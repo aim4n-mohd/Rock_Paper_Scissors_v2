@@ -10,12 +10,18 @@ export const scale = (value: Vector, scalar: number): Vector =>
 export const magnitudeSquared = (value: Vector): number => value.x * value.x + value.y * value.y;
 export const magnitude = (value: Vector): number => Math.sqrt(magnitudeSquared(value));
 export const distance = (a: Vector, b: Vector): number => magnitude(subtract(a, b));
+export const dot = (a: Vector, b: Vector): number => a.x * b.x + a.y * b.y;
 export function normalize(value: Vector): Vector {
   const length = magnitude(value);
   return length === 0 ? vec() : scale(value, 1 / length);
 }
 export function clampMagnitude(value: Vector, maximum: number): Vector {
   return magnitudeSquared(value) > maximum * maximum ? scale(normalize(value), maximum) : value;
+}
+export function rotate(value: Vector, radians: number): Vector {
+  const cosine = Math.cos(radians);
+  const sine = Math.sin(radians);
+  return vec(value.x * cosine - value.y * sine, value.x * sine + value.y * cosine);
 }
 export const average = (values: readonly Vector[]): Vector =>
   values.length === 0 ? vec() : scale(values.reduce(add, vec()), 1 / values.length);
