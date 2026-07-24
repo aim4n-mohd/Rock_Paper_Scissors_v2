@@ -14,16 +14,22 @@ export interface MinimapMarker {
   isAnchor: boolean;
 }
 
+export function clampAlpha(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+
 export function buildMinimapMarkers(
   units: readonly Unit[],
   anchorId: string | undefined,
   mapper: MinimapCoordinateMapper,
   config: MinimapConfig,
 ): MinimapMarker[] {
+  const playerFaction = units.find((unit) => unit.id === anchorId)?.faction;
   return units.flatMap((unit) => {
     if (!unit.alive) return [];
     const position = mapper.worldToMinimap(unit.position);
-    const recruited = unit.faction === 'rock' && unit.recruited;
+    const recruited = unit.recruited;
     return [
       {
         id: unit.id,
@@ -31,7 +37,10 @@ export function buildMinimapMarkers(
         x: position.x,
         y: position.y,
         size: recruited ? config.playerMarkerSize : config.unitMarkerSize,
-        alpha: unit.faction === 'rock' && !recruited ? config.neutralMarkerAlpha : 1,
+        alpha:
+          playerFaction !== undefined && unit.faction === playerFaction && !recruited
+            ? clampAlpha(config.neutralMarkerAlpha)
+            : clampAlpha(config.unitMarkerAlpha),
         recruited,
         isAnchor: unit.id === anchorId,
       },

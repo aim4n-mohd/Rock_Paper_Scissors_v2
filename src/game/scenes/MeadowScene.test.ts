@@ -30,6 +30,9 @@ function graphicsDouble() {
     'strokeCircle',
     'fillRoundedRect',
     'lineBetween',
+    'beginPath',
+    'arc',
+    'strokePath',
     'setDepth',
     'setScrollFactor',
     'destroy',
@@ -37,6 +40,14 @@ function graphicsDouble() {
     graphics[method] = vi.fn(() => graphics);
   }
   return graphics;
+}
+
+function textDouble() {
+  const text: Record<string, ReturnType<typeof vi.fn>> = {};
+  for (const method of ['destroy', 'setDepth', 'setOrigin', 'setPosition', 'setScrollFactor']) {
+    text[method] = vi.fn(() => text);
+  }
+  return text;
 }
 
 describe('MeadowScene lifecycle', () => {
@@ -48,6 +59,7 @@ describe('MeadowScene lifecycle', () => {
     const actorGraphics = graphicsDouble();
     const minimapStaticGraphics = graphicsDouble();
     const minimapDynamicGraphics = graphicsDouble();
+    const dashLabel = textDouble();
     const setBounds = vi.fn();
     const camera = { setBounds, scrollX: 0, scrollY: 0, zoom: 1 };
     let shutdown: (() => void) | undefined;
@@ -71,6 +83,7 @@ describe('MeadowScene lifecycle', () => {
           .mockReturnValueOnce(actorGraphics)
           .mockReturnValueOnce(minimapStaticGraphics)
           .mockReturnValueOnce(minimapDynamicGraphics),
+        text: vi.fn().mockReturnValue(dashLabel),
       },
       events: {
         once: vi.fn((event: string, callback: () => void) => {
@@ -83,8 +96,17 @@ describe('MeadowScene lifecycle', () => {
     expect(setBounds).toHaveBeenCalledWith(0, 0, GAME_CONFIG.world.width, GAME_CONFIG.world.height);
     expect(gameBridge.latest?.counts).toEqual(GAME_CONFIG.population);
 
+    gameBridge.setKey('d', true);
+    gameBridge.requestDash();
+    expect(gameBridge.latest?.dash.phase).toBe('active');
+
     scene.update(0, 100);
     expect(actorGraphics.clear).toHaveBeenCalled();
+    expect(actorGraphics.strokeCircle).toHaveBeenCalledWith(
+      GAME_CONFIG.landmarks.shrine.x,
+      GAME_CONFIG.landmarks.shrine.y,
+      GAME_CONFIG.shrine.activationRadius,
+    );
     expect(minimapDynamicGraphics.clear).toHaveBeenCalled();
     expect(gameBridge.latest?.elapsedMs).toBe(100);
     expect(Number.isFinite(camera.scrollX)).toBe(true);
@@ -92,8 +114,12 @@ describe('MeadowScene lifecycle', () => {
 
     expect(shutdown).toBeTypeOf('function');
     shutdown?.();
+    const snapshotAfterShutdown = gameBridge.latest;
+    gameBridge.requestDash();
+    expect(gameBridge.latest).toBe(snapshotAfterShutdown);
     expect(releaseController).toHaveBeenCalledOnce();
     expect(minimapStaticGraphics.destroy).toHaveBeenCalledOnce();
     expect(minimapDynamicGraphics.destroy).toHaveBeenCalledOnce();
+    expect(dashLabel.destroy).toHaveBeenCalledOnce();
   });
 });

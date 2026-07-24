@@ -1,6 +1,6 @@
 # Rock, Paper, Scissors v2.2
 
-A client-only, top-down arcade game built with React, TypeScript, Phaser, and Vite. Lead a loose Rock swarm, recruit neutral Rocks, hunt Scissors, flee Paper, and eliminate both enemy factions.
+A client-only, top-down arcade game built with React, TypeScript, Phaser, and Vite. Lead a loose swarm through a living faction ecosystem, recruit allies, and optionally make one costly faction switch at the central Triad Shrine.
 
 ## Requirements
 
@@ -19,6 +19,9 @@ Open the local URL printed by Vite.
 Controls:
 
 - WASD or arrow keys: move the recruited Rock swarm
+- Space: short dash when ready
+- Q / E: select one of the two eligible shrine factions
+- Hold F: channel the shrine while the entire recruited swarm is in range
 - Escape: pause or resume
 - R: restart the match
 
@@ -44,7 +47,7 @@ The Vitest suite covers framework-independent gameplay systems, the React shell,
 
 - `src/game/config`: typed balance values and faction relationships
 - `src/game/model`: framework-independent unit and particle state
-- `src/game/systems`: AI selection/memory, arcade steering, spawning, recruitment, combat, and spatial rules
+- `src/game/systems`: AI selection/memory, arcade steering, swarm speed, dash, spawning, recruitment, combat, shrine, and spatial rules
 - `src/game/simulation`: fixed-step match simulation and state transitions
 - `src/game/minimap`: coordinate mapping, live marker projection, and cached Phaser minimap rendering
 - `src/game/scenes`: Phaser rendering and lifecycle adapter
@@ -56,9 +59,11 @@ Phaser renders the meadow and units. Gameplay rules remain outside Phaser so the
 
 ## Balancing
 
-All gameplay tuning lives in `src/game/config/gameConfig.ts`, including population, health, detection, damage, recruitment, fixed-step timing, and per-unit motion. Motion values cover maximum speed, acceleration, deceleration, drag, steering force, turn rate, decision interval, reaction delay, prediction time/error, flee speed, and obstacle avoidance. Swarm configuration controls loose offsets, separation, cohesion, return strength, and the invisible player target.
+All gameplay tuning lives in `src/game/config/gameConfig.ts`, including population, health, detection, damage, recruitment, fixed-step timing, and per-unit motion. Motion values cover maximum speed, acceleration, deceleration, drag, steering force, turn rate, decision interval, reaction delay, prediction time/error, flee speed, and obstacle avoidance. Swarm configuration controls compact offsets, separation, cohesion, return strength, the invisible player target, and the reduced idle-correction speed. `playerMovement` controls base player speed, per-recruit bonus, and the maximum bonus cap. `dash` controls enablement, multiplier, duration, cooldown, direction fallback, collision policy, and feedback particles. Minimap configuration also controls the thin `Dash - SPACE` cooldown indicator geometry.
 
-The same file contains the display-only `minimap` block: enablement, maximum size, margin/padding, opacity, border thicknesses, unit/recruited marker sizes, neutral Rock opacity, and tree/shrine visibility. The shrine is a visual landmark only; it does not add faction switching or other gameplay.
+The same file contains the display-only `minimap` block: enablement, maximum size, margin/padding, independently clamped background/terrain/border/unit/viewport alpha, border thicknesses, unit/recruited marker sizes, neutral-faction opacity, and tree/shrine visibility.
+
+The `shrine` block owns its activation radius, two-second channel, minimum recruits, 20% rounded-up sacrifice, channel and post-transform speed multipliers, interruption threshold, one-use limit, particle effect, and circular platform geometry. The defaults intentionally use a wider round platform and a thin outer ring. Changing shrine balance does not require editing simulation or rendering systems.
 
 `validateConfig` rejects unsafe values during startup. Keep `advantageDamage` greater than `disadvantageDamage`, retain at least one Rock for the initial anchor, and run the complete validation suite after any balance change.
 

@@ -62,11 +62,38 @@ Tests: nonzero-origin coordinate mapping; out-of-bounds clamping; aspect-preserv
 
 Gate: focused minimap tests, the complete suite, coverage, typecheck, lint, format, root/subpath builds, regular browser flows, and production smoke all pass.
 
+## Phase 9 — Limited-use Triad Shrine
+
+Promote the central landmark into a simulation-owned, once-per-match faction switch. Add config-driven eligibility, faction selection, whole-swarm radius checks, a cancellable two-second channel, channel movement slowdown, advantaged-hit interruption, rounded-up sacrifice, recruited survivor transformation, former-faction independence, dynamic recruitment and result logic, and a timed post-transform movement penalty. Render a wide circular platform with a thin outer ring, faction glyphs, selection/sacrifice feedback, progress, transformation particles, and a used state.
+
+Tests: outside-radius rejection; in-radius progress; leave, input-release, and high-hit interruption; minimum population and current-faction guards; rounded sacrifice; survivor faction/recruited state; immediate relationship/recruitment/former-ally/HUD updates; single-use enforcement; penalty expiry; dynamic victory/defeat; and restart reset. Browser coverage must confirm requirements, selection, and input gating.
+
+Gate: focused shrine tests and the complete unit/integration/UI/browser suite pass, followed by coverage, typecheck, lint, format, root/subpath builds, and production smoke.
+
+## Phase 10 — Minimap transparency, living-swarm speed, and dash
+
+Split minimap opacity into independently configurable background, terrain, border, unit-marker, and camera-viewport alpha values, clamped at the renderer boundary. Add a pure capped speed multiplier based only on living recruited units. Add a pure dash state machine with current/remembered direction, duration, cooldown, pause/restart semantics, optional collision cancellation, and config-driven feedback particles. Compose normal swarm speed first and dash second through the existing accelerated player-target and loose steering path. Match solo player speed to the independent AI base, lengthen and strengthen the dash, and render a small `Dash - SPACE` indicator above the minimap whose fill is derived from authoritative dash state.
+
+Tests: distinct and clamped minimap layer alpha without mapping changes; deterministic/capped swarm-speed calculation; solo/AI base-speed parity; same-step recruitment and death updates; neutral/enemy exclusion; unchanged independent AI limits; dash activation/direction/timing/cooldown/pause/restart; recruited-only movement; tree/boundary safety; feedback cleanup; fresh Space input; authoritative cooldown fill; label/bar placement above the minimap; absence of persistent top-HUD labels; scene teardown; and Chromium keyboard flow.
+
+Gate: focused tests and the full existing suite pass, followed by coverage, typecheck, lint, format, browser validation, production build, and production smoke.
+
+## Phase 11 — Idle swarm stability and tighter cohesion
+
+Recenter the invisible player target on the living recruited swarm whenever movement input is absent. Add an optional steering target-speed scale so small idle formation corrections decelerate instead of becoming full-speed commands. Apply quadratic correction falloff only to idle recruited units, preserving normal independent AI, active player movement, dash, knockback, separation, and obstacle avoidance. Reduce formation offset and maximum-return radii while strengthening cohesion and return force.
+
+Tests: gentle target-speed scaling; no-input settling after active movement; bounded idle center drift and velocity; tighter compact formation radius; config validation; active loose steering; independent AI limits; tree safety; dash behavior; and shrine movement penalties.
+
+Gate: focused movement tests and the full validation matrix pass, followed by browser visual inspection.
+
 ## Architecture boundaries
 
 - `src/game/config`: all tunable values and faction tables.
 - `src/game/model`: framework-independent state.
 - `src/game/systems`: pure or deterministic simulation behavior.
+- `src/game/systems/shrine.ts`: pure shrine selection, eligibility, channel, cost, and timer rules.
+- `src/game/systems/swarmSpeed.ts`: pure living-recruit speed multiplier.
+- `src/game/systems/dash.ts`: pure dash request, direction, duration, cooldown, collision, and reset state.
 - `src/game/scenes`: Phaser adapter and rendering only.
 - `src/game/minimap`: pure projection/model logic plus the fixed-screen Phaser minimap adapter.
 - `src/game/events`: typed bridge snapshots/events.

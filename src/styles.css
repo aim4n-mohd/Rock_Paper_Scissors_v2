@@ -83,6 +83,41 @@ button {
 .timer {
   background: #2b4526;
 }
+.shrine-panel {
+  position: absolute;
+  z-index: 3;
+  right: 14px;
+  bottom: 14px;
+  display: grid;
+  min-width: 190px;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #e5c86680;
+  border-radius: 12px;
+  color: #fff4c4;
+  background: #171b14e6;
+  box-shadow: 0 6px 20px #0007;
+  font-size: clamp(0.66rem, 1.3vw, 0.82rem);
+}
+.shrine-panel strong {
+  color: #f4d56f;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+.shrine-panel progress {
+  width: 100%;
+  height: 6px;
+  accent-color: #f4d56f;
+}
+.shrine-used {
+  border-color: #a1a69870;
+  color: #b9bfae;
+  filter: saturate(0.35);
+}
+.shrine-penalty {
+  color: #ffad73;
+  font-weight: 800;
+}
 .overlay {
   position: absolute;
   inset: 0;

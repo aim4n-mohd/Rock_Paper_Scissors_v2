@@ -31,6 +31,7 @@ export function steerVelocity(
   maximumSpeed: number,
   deltaMs: number,
   motion: UnitMotionConfig,
+  targetSpeedScale = 1,
 ): Vector {
   const seconds = Math.max(0, deltaMs) / 1000;
   if (seconds === 0) return { ...currentVelocity };
@@ -44,10 +45,14 @@ export function steerVelocity(
     return dragged === 0 ? vec() : scale(normalize(currentVelocity), dragged);
   }
 
+  const safeTargetScale = Number.isFinite(targetSpeedScale)
+    ? Math.max(0, Math.min(1, targetSpeedScale))
+    : 0;
+  const targetSpeed = maximumSpeed * safeTargetScale;
   const limitedHeading = turnToward(currentVelocity, desired, motion.maxTurnRate * seconds);
-  const targetVelocity = scale(limitedHeading, maximumSpeed);
+  const targetVelocity = scale(limitedHeading, targetSpeed);
   const change = subtract(targetVelocity, currentVelocity);
-  const speedRate = currentSpeed < maximumSpeed ? motion.acceleration : motion.deceleration;
+  const speedRate = currentSpeed < targetSpeed ? motion.acceleration : motion.deceleration;
   const maximumChange = Math.min(speedRate, motion.maxSteeringForce) * seconds;
   const accelerated = add(currentVelocity, clampMagnitude(change, maximumChange));
   const dragged = scale(accelerated, Math.exp(-motion.drag * seconds));

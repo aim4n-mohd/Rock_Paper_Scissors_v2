@@ -7,6 +7,8 @@ interface GameController {
   togglePause(): void;
   restart(): void;
   killFaction(faction: Faction): void;
+  cycleShrineSelection(direction: -1 | 1): void;
+  requestDash(): void;
 }
 
 class GameBridge {
@@ -48,6 +50,10 @@ class GameBridge {
     return normalize(vec(Number(right) - Number(left), Number(down) - Number(up)));
   }
 
+  get interactionHeld(): boolean {
+    return this.pressed.has('f');
+  }
+
   togglePause(): void {
     this.clearInput();
     this.controllers[this.controllers.length - 1]?.togglePause();
@@ -58,6 +64,12 @@ class GameBridge {
   }
   killFaction(faction: Faction): void {
     this.controllers[this.controllers.length - 1]?.killFaction(faction);
+  }
+  cycleShrineSelection(direction: -1 | 1): void {
+    this.controllers[this.controllers.length - 1]?.cycleShrineSelection(direction);
+  }
+  requestDash(): void {
+    this.controllers[this.controllers.length - 1]?.requestDash();
   }
 
   clearInput(): void {

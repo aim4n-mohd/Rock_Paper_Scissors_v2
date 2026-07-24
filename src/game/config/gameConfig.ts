@@ -22,13 +22,61 @@ export interface MinimapConfig {
   margin: number;
   padding: number;
   backgroundAlpha: number;
+  borderAlpha: number;
+  terrainAlpha: number;
+  unitMarkerAlpha: number;
+  viewportAlpha: number;
   borderThickness: number;
   unitMarkerSize: number;
   playerMarkerSize: number;
   neutralMarkerAlpha: number;
   viewportBorderThickness: number;
+  dashBarHeight: number;
+  dashBarGap: number;
+  dashLabelGap: number;
+  dashLabelFontSize: number;
   showTrees: boolean;
   showShrine: boolean;
+}
+
+export interface PlayerMovementConfig {
+  baseSwarmSpeed: number;
+  speedBonusPerUnit: number;
+  maxSwarmSpeedBonus: number;
+}
+
+export interface DashConfig {
+  enabled: boolean;
+  speedMultiplier: number;
+  durationMs: number;
+  cooldownMs: number;
+  minimumInputMagnitude: number;
+  allowWhilePaused: boolean;
+  cancelOnCollision: boolean;
+  useLastDirection: boolean;
+  particleCount: number;
+  particleLifetimeMs: number;
+  particleSpeed: number;
+}
+
+export interface ShrineConfig {
+  activationRadius: number;
+  channelDurationMs: number;
+  minimumRecruitedUnits: number;
+  sacrificeRatio: number;
+  channelSpeedMultiplier: number;
+  postTransformPenaltyMs: number;
+  postTransformSpeedMultiplier: number;
+  highDamageInterruptThreshold: number;
+  maxUses: number;
+  effectLifetimeMs: number;
+  effectParticleCount: number;
+  effectParticleSpeed: number;
+  platformRadius: number;
+  outerRingRadius: number;
+  ringThickness: number;
+  symbolOrbitRadius: number;
+  symbolSize: number;
 }
 
 export interface GameConfig {
@@ -59,12 +107,16 @@ export interface GameConfig {
     offsetRadius: number;
     arrivalRadius: number;
     returnStrength: number;
+    idleSpeedMultiplier: number;
   };
+  playerMovement: PlayerMovementConfig;
+  dash: DashConfig;
   simulation: { fixedStepMs: number; maxFrameMs: number };
   particles: { count: number; lifetimeMs: number; speed: number };
   camera: { smoothing: number };
   trees: { radius: number; positions: readonly { x: number; y: number }[] };
   landmarks: { shrine: { x: number; y: number } };
+  shrine: ShrineConfig;
   minimap: MinimapConfig;
 }
 
@@ -128,32 +180,78 @@ export const GAME_CONFIG: GameConfig = {
   },
   recruitment: { radius: 62 },
   swarm: {
-    cohesion: 0.34,
+    cohesion: 0.46,
     separation: 1.1,
-    separationRadius: 34,
-    maxDistance: 230,
+    separationRadius: 30,
+    maxDistance: 170,
     maxInputSpeed: 1,
-    offsetRadius: 52,
-    arrivalRadius: 14,
-    returnStrength: 2.2,
+    offsetRadius: 38,
+    arrivalRadius: 10,
+    returnStrength: 2.8,
+    idleSpeedMultiplier: 0.45,
+  },
+  playerMovement: {
+    baseSwarmSpeed: 112,
+    speedBonusPerUnit: 0.02,
+    maxSwarmSpeedBonus: 0.45,
+  },
+  dash: {
+    enabled: true,
+    speedMultiplier: 3.4,
+    durationMs: 720,
+    cooldownMs: 2400,
+    minimumInputMagnitude: 0.1,
+    allowWhilePaused: false,
+    cancelOnCollision: false,
+    useLastDirection: true,
+    particleCount: 5,
+    particleLifetimeMs: 240,
+    particleSpeed: 45,
   },
   simulation: { fixedStepMs: 1000 / 60, maxFrameMs: 1000 },
   particles: { count: 8, lifetimeMs: 650, speed: 55 },
   camera: { smoothing: 0.09 },
   trees: { radius: 34, positions: TREE_POSITIONS },
   landmarks: { shrine: { x: 1440, y: 810 } },
+  shrine: {
+    activationRadius: 115,
+    channelDurationMs: 2000,
+    minimumRecruitedUnits: 4,
+    sacrificeRatio: 0.2,
+    channelSpeedMultiplier: 0.24,
+    postTransformPenaltyMs: 3000,
+    postTransformSpeedMultiplier: 0.55,
+    highDamageInterruptThreshold: 35,
+    maxUses: 1,
+    effectLifetimeMs: 900,
+    effectParticleCount: 8,
+    effectParticleSpeed: 90,
+    platformRadius: 38,
+    outerRingRadius: 52,
+    ringThickness: 2,
+    symbolOrbitRadius: 27,
+    symbolSize: 6,
+  },
   minimap: {
     enabled: true,
     width: 180,
     maxHeight: 130,
     margin: 12,
     padding: 5,
-    backgroundAlpha: 0.75,
+    backgroundAlpha: 0.45,
+    borderAlpha: 0.8,
+    terrainAlpha: 0.5,
+    unitMarkerAlpha: 0.9,
+    viewportAlpha: 0.9,
     borderThickness: 2,
     unitMarkerSize: 3,
     playerMarkerSize: 5,
     neutralMarkerAlpha: 0.55,
     viewportBorderThickness: 1,
+    dashBarHeight: 4,
+    dashBarGap: 6,
+    dashLabelGap: 2,
+    dashLabelFontSize: 9,
     showTrees: true,
     showShrine: true,
   },
@@ -191,6 +289,13 @@ export function validateConfig(config: GameConfig): void {
     ['swarm.offsetRadius', config.swarm.offsetRadius],
     ['swarm.arrivalRadius', config.swarm.arrivalRadius],
     ['swarm.returnStrength', config.swarm.returnStrength],
+    ['swarm.idleSpeedMultiplier', config.swarm.idleSpeedMultiplier],
+    ['playerMovement.baseSwarmSpeed', config.playerMovement.baseSwarmSpeed],
+    ['dash.speedMultiplier', config.dash.speedMultiplier],
+    ['dash.durationMs', config.dash.durationMs],
+    ['dash.cooldownMs', config.dash.cooldownMs],
+    ['dash.particleLifetimeMs', config.dash.particleLifetimeMs],
+    ['dash.particleSpeed', config.dash.particleSpeed],
     ['simulation.fixedStepMs', config.simulation.fixedStepMs],
     ['simulation.maxFrameMs', config.simulation.maxFrameMs],
     ['particles.lifetimeMs', config.particles.lifetimeMs],
@@ -204,6 +309,26 @@ export function validateConfig(config: GameConfig): void {
     ['minimap.unitMarkerSize', config.minimap.unitMarkerSize],
     ['minimap.playerMarkerSize', config.minimap.playerMarkerSize],
     ['minimap.viewportBorderThickness', config.minimap.viewportBorderThickness],
+    ['minimap.dashBarHeight', config.minimap.dashBarHeight],
+    ['minimap.dashBarGap', config.minimap.dashBarGap],
+    ['minimap.dashLabelGap', config.minimap.dashLabelGap],
+    ['minimap.dashLabelFontSize', config.minimap.dashLabelFontSize],
+    ['shrine.activationRadius', config.shrine.activationRadius],
+    ['shrine.channelDurationMs', config.shrine.channelDurationMs],
+    ['shrine.minimumRecruitedUnits', config.shrine.minimumRecruitedUnits],
+    ['shrine.channelSpeedMultiplier', config.shrine.channelSpeedMultiplier],
+    ['shrine.postTransformPenaltyMs', config.shrine.postTransformPenaltyMs],
+    ['shrine.postTransformSpeedMultiplier', config.shrine.postTransformSpeedMultiplier],
+    ['shrine.highDamageInterruptThreshold', config.shrine.highDamageInterruptThreshold],
+    ['shrine.maxUses', config.shrine.maxUses],
+    ['shrine.effectLifetimeMs', config.shrine.effectLifetimeMs],
+    ['shrine.effectParticleCount', config.shrine.effectParticleCount],
+    ['shrine.effectParticleSpeed', config.shrine.effectParticleSpeed],
+    ['shrine.platformRadius', config.shrine.platformRadius],
+    ['shrine.outerRingRadius', config.shrine.outerRingRadius],
+    ['shrine.ringThickness', config.shrine.ringThickness],
+    ['shrine.symbolOrbitRadius', config.shrine.symbolOrbitRadius],
+    ['shrine.symbolSize', config.shrine.symbolSize],
   ];
   for (const [name, value] of positives) {
     if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be positive.`);
@@ -216,17 +341,60 @@ export function validateConfig(config: GameConfig): void {
   ] as const) {
     if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be non-negative.`);
   }
+  if (
+    !Number.isFinite(config.dash.minimumInputMagnitude) ||
+    config.dash.minimumInputMagnitude < 0 ||
+    config.dash.minimumInputMagnitude > 1
+  )
+    throw new Error('dash.minimumInputMagnitude must be between 0 and 1.');
+  if (!Number.isInteger(config.dash.particleCount) || config.dash.particleCount <= 0)
+    throw new Error('dash.particleCount must be a positive integer.');
   for (const [name, value] of [
     ['minimap.backgroundAlpha', config.minimap.backgroundAlpha],
+    ['minimap.borderAlpha', config.minimap.borderAlpha],
+    ['minimap.terrainAlpha', config.minimap.terrainAlpha],
+    ['minimap.unitMarkerAlpha', config.minimap.unitMarkerAlpha],
+    ['minimap.viewportAlpha', config.minimap.viewportAlpha],
     ['minimap.neutralMarkerAlpha', config.minimap.neutralMarkerAlpha],
   ] as const) {
-    if (!Number.isFinite(value) || value < 0 || value > 1)
-      throw new Error(`${name} must be between 0 and 1.`);
+    if (!Number.isFinite(value)) throw new Error(`${name} must be finite.`);
+  }
+  for (const [name, value] of [
+    ['playerMovement.speedBonusPerUnit', config.playerMovement.speedBonusPerUnit],
+    ['playerMovement.maxSwarmSpeedBonus', config.playerMovement.maxSwarmSpeedBonus],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be non-negative.`);
   }
   if (config.minimap.padding * 2 >= config.minimap.width)
     throw new Error('minimap.padding must leave positive drawing width.');
   if (config.minimap.padding * 2 >= config.minimap.maxHeight)
     throw new Error('minimap.padding must leave positive drawing height.');
+  if (
+    !Number.isFinite(config.shrine.sacrificeRatio) ||
+    config.shrine.sacrificeRatio <= 0 ||
+    config.shrine.sacrificeRatio >= 1
+  )
+    throw new Error('shrine.sacrificeRatio must be greater than 0 and less than 1.');
+  for (const [name, value] of [
+    ['shrine.channelSpeedMultiplier', config.shrine.channelSpeedMultiplier],
+    ['shrine.postTransformSpeedMultiplier', config.shrine.postTransformSpeedMultiplier],
+  ] as const) {
+    if (value > 1) throw new Error(`${name} must be at most 1.`);
+  }
+  for (const [name, value] of [
+    ['shrine.minimumRecruitedUnits', config.shrine.minimumRecruitedUnits],
+    ['shrine.maxUses', config.shrine.maxUses],
+    ['shrine.effectParticleCount', config.shrine.effectParticleCount],
+  ] as const) {
+    if (!Number.isInteger(value)) throw new Error(`${name} must be an integer.`);
+  }
+  if (config.shrine.platformRadius >= config.shrine.outerRingRadius)
+    throw new Error('shrine.outerRingRadius must exceed platformRadius.');
+  if (
+    Math.ceil(config.shrine.minimumRecruitedUnits * config.shrine.sacrificeRatio) >=
+    config.shrine.minimumRecruitedUnits
+  )
+    throw new Error('shrine.sacrificeRatio must leave at least one transformed survivor.');
   for (const [name, value] of [
     ['units.motion.drag', config.units.motion.drag],
     ['units.motion.reactionDelayMs', config.units.motion.reactionDelayMs],

@@ -20,6 +20,37 @@ test('starts a live meadow and moves the Rock swarm', async ({ page }) => {
   expect(after).toBeGreaterThan(before + 20);
 });
 
+test('dashes from a fresh Space press without adding a top HUD label and resets cleanly', async ({
+  page,
+}) => {
+  await startGame(page);
+  await page.keyboard.down('d');
+  await page.keyboard.press('Space');
+  await expect
+    .poll(() => page.evaluate(() => window.__RPS_TEST__!.snapshot()!.dash.phase))
+    .not.toBe('ready');
+  await expect(page.getByLabel('Dash status')).toHaveCount(0);
+  await page.keyboard.up('d');
+  await page.keyboard.press('r');
+  await expect
+    .poll(() => page.evaluate(() => window.__RPS_TEST__!.snapshot()!.dash.phase))
+    .toBe('ready');
+});
+
+test('shows shrine requirements and selects an eligible faction', async ({ page }) => {
+  await startGame(page);
+  const shrine = page.getByLabel('Triad Shrine');
+  await expect(shrine).toContainText('Need 4 recruited units');
+  await page.keyboard.press('e');
+  await expect(shrine).toContainText('Selected Paper');
+  await page.keyboard.down('f');
+  await page.waitForTimeout(250);
+  await page.keyboard.up('f');
+  expect(await page.evaluate(() => window.__RPS_TEST__!.snapshot()!.shrine.channelProgressMs)).toBe(
+    0,
+  );
+});
+
 test('pauses time and restarts cleanly', async ({ page }) => {
   await startGame(page);
   await page.waitForTimeout(350);
@@ -51,5 +82,5 @@ test('shows victory and can play again', async ({ page }) => {
 test('shows defeat only after every Rock is gone', async ({ page }) => {
   await startGame(page);
   await page.evaluate(() => window.__RPS_TEST__!.killFaction('rock'));
-  await expect(page.getByRole('heading', { name: /rocks are gone/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /rock swarm is gone/i })).toBeVisible();
 });

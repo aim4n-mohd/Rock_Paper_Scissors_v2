@@ -28,10 +28,10 @@ describe('buildMinimapMarkers', () => {
     expect(markers.map((marker) => marker.faction)).toEqual(['rock', 'rock', 'paper', 'scissors']);
   });
 
-  it('makes recruited Rocks prominent, dims neutral Rocks, and marks the anchor', () => {
-    const anchor = createUnit('anchor', 'rock', { x: 20, y: 20 }, true);
-    const recruited = createUnit('recruited', 'rock', { x: 30, y: 30 }, true);
-    const neutral = createUnit('neutral', 'rock', { x: 40, y: 40 });
+  it('makes the recruited faction prominent, dims its neutral units, and marks the anchor', () => {
+    const anchor = createUnit('anchor', 'paper', { x: 20, y: 20 }, true);
+    const recruited = createUnit('recruited', 'paper', { x: 30, y: 30 }, true);
+    const neutral = createUnit('neutral', 'paper', { x: 40, y: 40 });
 
     const markers = buildMinimapMarkers(
       [anchor, recruited, neutral],
@@ -42,12 +42,12 @@ describe('buildMinimapMarkers', () => {
 
     expect(markers[0]).toMatchObject({
       size: GAME_CONFIG.minimap.playerMarkerSize,
-      alpha: 1,
+      alpha: GAME_CONFIG.minimap.unitMarkerAlpha,
       isAnchor: true,
     });
     expect(markers[1]).toMatchObject({
       size: GAME_CONFIG.minimap.playerMarkerSize,
-      alpha: 1,
+      alpha: GAME_CONFIG.minimap.unitMarkerAlpha,
       isAnchor: false,
     });
     expect(markers[2]).toMatchObject({
@@ -67,5 +67,21 @@ describe('buildMinimapMarkers', () => {
     expect(buildMinimapMarkers([unit], undefined, mapper, GAME_CONFIG.minimap)[0]?.faction).toBe(
       'paper',
     );
+  });
+
+  it('changes marker alpha without changing coordinate mapping', () => {
+    const unit = createUnit('unit', 'rock', { x: 50, y: 25 }, true);
+    const faint = buildMinimapMarkers([unit], unit.id, mapper, {
+      ...GAME_CONFIG.minimap,
+      unitMarkerAlpha: 0.2,
+    })[0]!;
+    const vivid = buildMinimapMarkers([unit], unit.id, mapper, {
+      ...GAME_CONFIG.minimap,
+      unitMarkerAlpha: 0.9,
+    })[0]!;
+
+    expect(faint.alpha).toBe(0.2);
+    expect(vivid.alpha).toBe(0.9);
+    expect({ x: faint.x, y: faint.y }).toEqual({ x: vivid.x, y: vivid.y });
   });
 });

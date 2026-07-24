@@ -57,7 +57,7 @@ export function createUnit(
     maxHealth: GAME_CONFIG.units.maxHealth,
     radius: GAME_CONFIG.units.radius,
     alive: true,
-    recruited: faction === 'rock' && recruited,
+    recruited,
     intent: recruited ? 'player' : 'wander',
     lastHits: new Map(),
     knockback: vec(),

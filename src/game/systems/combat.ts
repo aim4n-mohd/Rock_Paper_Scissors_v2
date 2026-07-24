@@ -6,6 +6,14 @@ import { damageUnit, type Unit } from '../model/unit';
 export interface CombatResult {
   hitCount: number;
   deaths: string[];
+  hits: CombatHit[];
+}
+
+export interface CombatHit {
+  attackerId: string;
+  targetId: string;
+  damage: number;
+  advantaged: boolean;
 }
 
 function damageFor(attacker: Unit, target: Unit): number {
@@ -21,10 +29,10 @@ function canHit(attacker: Unit, target: Unit, nowMs: number): boolean {
 }
 
 export function resolveCombatPair(a: Unit, b: Unit, nowMs: number): CombatResult {
-  if (!a.alive || !b.alive || a.faction === b.faction) return { hitCount: 0, deaths: [] };
+  if (!a.alive || !b.alive || a.faction === b.faction) return { hitCount: 0, deaths: [], hits: [] };
   const aCanHit = canHit(a, b, nowMs);
   const bCanHit = canHit(b, a, nowMs);
-  if (!aCanHit && !bCanHit) return { hitCount: 0, deaths: [] };
+  if (!aCanHit && !bCanHit) return { hitCount: 0, deaths: [], hits: [] };
 
   const aDamage = bCanHit ? damageFor(b, a) : 0;
   const bDamage = aCanHit ? damageFor(a, b) : 0;
@@ -39,7 +47,22 @@ export function resolveCombatPair(a: Unit, b: Unit, nowMs: number): CombatResult
   b.knockbackRemainingMs = GAME_CONFIG.combat.knockbackDurationMs;
 
   const deaths: string[] = [];
+  const hits: CombatHit[] = [];
+  if (aCanHit)
+    hits.push({
+      attackerId: a.id,
+      targetId: b.id,
+      damage: bDamage,
+      advantaged: getRelationship(a.faction, b.faction) === 'prey',
+    });
+  if (bCanHit)
+    hits.push({
+      attackerId: b.id,
+      targetId: a.id,
+      damage: aDamage,
+      advantaged: getRelationship(b.faction, a.faction) === 'prey',
+    });
   if (damageUnit(a, aDamage)) deaths.push(a.id);
   if (damageUnit(b, bDamage)) deaths.push(b.id);
-  return { hitCount: Number(aCanHit) + Number(bCanHit), deaths };
+  return { hitCount: Number(aCanHit) + Number(bCanHit), deaths, hits };
 }

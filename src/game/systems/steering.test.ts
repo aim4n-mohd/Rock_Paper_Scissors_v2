@@ -54,6 +54,24 @@ describe('arcade steering integration', () => {
     expect(velocity.x).toBeLessThan(90);
   });
 
+  it('supports a reduced target-speed scale for gentle formation corrections', () => {
+    const motion = {
+      ...GAME_CONFIG.units.motion,
+      acceleration: 2000,
+      drag: 0,
+      maxSteeringForce: 2000,
+    };
+    const full = steerVelocity({ x: 0, y: 0 }, { x: 1, y: 0 }, 100, 100, motion);
+    const gentle = steerVelocity({ x: 0, y: 0 }, { x: 1, y: 0 }, 100, 100, motion, 0.2);
+
+    expect(gentle.x).toBeCloseTo(20);
+    expect(gentle.x).toBeLessThan(full.x);
+    expect(steerVelocity({ x: 0, y: 0 }, { x: 1, y: 0 }, 100, 100, motion, Number.NaN)).toEqual({
+      x: 0,
+      y: 0,
+    });
+  });
+
   it('can overshoot a remembered target after a sharp pursuit correction', () => {
     const hunter = createUnit('hunter', 'paper', { x: 100, y: 100 });
     const target = createUnit('target', 'rock', { x: 160, y: 100 });

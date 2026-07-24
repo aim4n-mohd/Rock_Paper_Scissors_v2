@@ -8,4 +8,5 @@ export interface Particle {
   velocity: Vector;
   remainingMs: number;
   lifetimeMs: number;
+  effect: 'death' | 'shrine' | 'dash';
 }

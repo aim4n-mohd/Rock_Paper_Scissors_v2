@@ -44,3 +44,32 @@
 - [x] MM1.5 Integrate minimap create/update/resize/destroy behavior with `MeadowScene`.
 - [x] MM1.6 Add the central shrine as a visual landmark only, without shrine gameplay or faction switching.
 - [x] MM1.7 Pass focused tests and the complete validation matrix.
+
+## Limited-use Triad Shrine
+
+- [x] SH1.1 Add typed shrine configuration, validation, and round platform geometry.
+- [x] SH1.2 Add deterministic selection, eligibility, channel, cancellation, sacrifice, and single-use rules.
+- [x] SH1.3 Transform surviving recruits and immediately update faction relationships, recruitment, AI ownership, anchor, HUD, and match results.
+- [x] SH1.4 Add channel and post-transform movement penalties plus distinct shrine particles.
+- [x] SH1.5 Add Q/E selection, hold-F interaction, React feedback, and Phaser radius/progress/selection/used visuals.
+- [x] SH1.6 Pass focused tests and the complete validation matrix.
+
+## Minimap transparency, living-swarm speed, and dash
+
+- [x] DS1.1 Add separate clamped minimap alpha configuration without changing placement or mapping.
+- [x] DS1.2 Add a pure capped living-recruited swarm speed multiplier.
+- [x] DS1.3 Compose swarm-size speed through the accelerated loose-swarm target without changing AI speed.
+- [x] DS1.4 Add a config-driven dash state machine with current/remembered direction, duration, cooldown, pause, collision, and restart handling.
+- [x] DS1.5 Add Space input, dust feedback, and scene bridge integration without adding persistent top-HUD labels.
+- [x] DS1.6 Pass focused tests and the complete validation matrix.
+- [x] DS1.7 Match solo player speed to the independent AI base speed.
+- [x] DS1.8 Double dash duration again and slightly increase its multiplier.
+- [x] DS1.9 Add a config-driven `Dash - SPACE` cooldown bar above the minimap.
+
+## Idle swarm stability
+
+- [x] IS1.1 Recenter the invisible target when player movement input stops.
+- [x] IS1.2 Add reduced target-speed scaling for gentle formation corrections.
+- [x] IS1.3 Apply quadratic idle correction damping without changing active or independent AI movement.
+- [x] IS1.4 Tighten formation offsets, maximum distance, cohesion, and return tuning.
+- [x] IS1.5 Verify idle settling, compactness, dash, trees, shrine penalties, and the full suite.

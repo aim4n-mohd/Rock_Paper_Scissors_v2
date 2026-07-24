@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { FACTIONS, type Faction } from '../config/factions';
 import { FACTION_COLORS } from '../config/factionVisuals';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { gameBridge } from '../events/gameBridge';
@@ -41,6 +42,14 @@ export class MeadowScene extends Phaser.Scene {
         this.simulation.killFaction(faction);
         this.publish();
       },
+      cycleShrineSelection: (direction) => {
+        this.simulation.cycleShrineSelection(direction);
+        this.publish();
+      },
+      requestDash: () => {
+        this.simulation.requestDash(gameBridge.input);
+        this.publish();
+      },
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       releaseController();
@@ -51,7 +60,7 @@ export class MeadowScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    this.simulation.update(delta, gameBridge.input);
+    this.simulation.update(delta, gameBridge.input, gameBridge.interactionHeld);
     this.drawActors();
     const target = this.simulation.swarmCenter();
     const desiredX = Phaser.Math.Clamp(
@@ -85,6 +94,7 @@ export class MeadowScene extends Phaser.Scene {
         zoom: this.cameras.main.zoom,
       },
       { width: this.scale.width, height: this.scale.height },
+      this.simulation.snapshot().dash,
     );
     this.lastPublish += delta;
     if (this.lastPublish >= 80) {
@@ -113,9 +123,18 @@ export class MeadowScene extends Phaser.Scene {
       GAME_CONFIG.world.height - 8,
     );
     const shrine = GAME_CONFIG.landmarks.shrine;
-    g.fillStyle(0x50482f, 0.5).fillCircle(shrine.x, shrine.y + 5, 25);
-    g.fillStyle(0xf2c95c, 0.9).fillCircle(shrine.x, shrine.y, 13);
-    g.lineStyle(3, 0x8a6c2d, 0.95).strokeCircle(shrine.x, shrine.y, 17);
+    g.fillStyle(0x252b22, 0.35).fillEllipse(
+      shrine.x + 4,
+      shrine.y + 10,
+      GAME_CONFIG.shrine.outerRingRadius * 2.1,
+      GAME_CONFIG.shrine.outerRingRadius * 0.75,
+    );
+    g.fillStyle(0x4b4936, 0.82).fillCircle(shrine.x, shrine.y, GAME_CONFIG.shrine.platformRadius);
+    g.lineStyle(GAME_CONFIG.shrine.ringThickness, 0xd9b953, 0.95).strokeCircle(
+      shrine.x,
+      shrine.y,
+      GAME_CONFIG.shrine.outerRingRadius,
+    );
     for (const tree of GAME_CONFIG.trees.positions) {
       g.fillStyle(0x304421, 0.35).fillEllipse(tree.x + 10, tree.y + 19, 70, 32);
       g.fillStyle(0x735232).fillRect(tree.x - 7, tree.y + 5, 14, 32);
@@ -127,6 +146,7 @@ export class MeadowScene extends Phaser.Scene {
 
   private drawActors(): void {
     const g = this.actorGraphics.clear();
+    this.drawShrine(g);
     for (const unit of this.simulation.units) {
       if (!unit.alive) continue;
       const color = unit.flashRemainingMs > 0 ? 0xffffff : FACTION_COLORS[unit.faction];
@@ -176,10 +196,112 @@ export class MeadowScene extends Phaser.Scene {
       }
     }
     for (const particle of this.simulation.particles) {
+      const shrineEffect = particle.effect === 'shrine';
+      const dashEffect = particle.effect === 'dash';
       g.fillStyle(
-        FACTION_COLORS[particle.faction],
+        shrineEffect ? 0xffe38a : dashEffect ? 0xd8c990 : FACTION_COLORS[particle.faction],
         particle.remainingMs / particle.lifetimeMs,
-      ).fillRect(particle.position.x - 2, particle.position.y - 2, 4, 4);
+      ).fillRect(
+        particle.position.x - (shrineEffect ? 3 : 2),
+        particle.position.y - (shrineEffect ? 3 : 2),
+        shrineEffect ? 6 : dashEffect ? 3 : 4,
+        shrineEffect ? 6 : dashEffect ? 3 : 4,
+      );
+    }
+  }
+
+  private drawShrine(g: Phaser.GameObjects.Graphics): void {
+    const center = GAME_CONFIG.landmarks.shrine;
+    const state = this.simulation.snapshot().shrine;
+    const inactive = state.status === 'used';
+    g.lineStyle(1, inactive ? 0x777c72 : 0xe7cb70, inactive ? 0.28 : 0.38).strokeCircle(
+      center.x,
+      center.y,
+      GAME_CONFIG.shrine.activationRadius,
+    );
+
+    for (const [index, faction] of FACTIONS.entries()) {
+      const angle = -Math.PI / 2 + (index * Math.PI * 2) / FACTIONS.length;
+      const position = {
+        x: center.x + Math.cos(angle) * GAME_CONFIG.shrine.symbolOrbitRadius,
+        y: center.y + Math.sin(angle) * GAME_CONFIG.shrine.symbolOrbitRadius,
+      };
+      const selected = state.selectedFaction === faction && !inactive;
+      if (selected)
+        g.lineStyle(2, 0xffe68b, 1).strokeCircle(
+          position.x,
+          position.y,
+          GAME_CONFIG.shrine.symbolSize + 5,
+        );
+      this.drawFactionGlyph(
+        g,
+        faction,
+        position.x,
+        position.y,
+        GAME_CONFIG.shrine.symbolSize,
+        inactive ? 0x777c72 : FACTION_COLORS[faction],
+        inactive ? 0.45 : 1,
+      );
+    }
+
+    if (state.selectedFaction && !inactive)
+      this.drawFactionGlyph(
+        g,
+        state.selectedFaction,
+        center.x,
+        center.y,
+        GAME_CONFIG.shrine.symbolSize + 2,
+        FACTION_COLORS[state.selectedFaction],
+        state.status === 'channeling' ? 1 : 0.7,
+      );
+
+    if (state.status === 'channeling') {
+      const progress = state.channelProgressMs / state.channelDurationMs;
+      g.lineStyle(4, 0xffe27b, 1)
+        .beginPath()
+        .arc(
+          center.x,
+          center.y,
+          GAME_CONFIG.shrine.outerRingRadius + 7,
+          -Math.PI / 2,
+          -Math.PI / 2 + Math.PI * 2 * progress,
+        )
+        .strokePath();
+    }
+    if (inactive)
+      g.lineStyle(3, 0x6f746c, 0.8)
+        .lineBetween(center.x - 17, center.y - 17, center.x + 17, center.y + 17)
+        .lineBetween(center.x + 17, center.y - 17, center.x - 17, center.y + 17);
+
+    if (state.transformationEffectRemainingMs > 0) {
+      const progress =
+        1 - state.transformationEffectRemainingMs / GAME_CONFIG.shrine.effectLifetimeMs;
+      g.lineStyle(4, 0xffefae, 1 - progress).strokeCircle(
+        center.x,
+        center.y,
+        GAME_CONFIG.shrine.outerRingRadius + progress * 70,
+      );
+    }
+  }
+
+  private drawFactionGlyph(
+    g: Phaser.GameObjects.Graphics,
+    faction: Faction,
+    x: number,
+    y: number,
+    size: number,
+    color: number,
+    alpha: number,
+  ): void {
+    g.fillStyle(color, alpha);
+    if (faction === 'rock') {
+      g.fillCircle(x, y, size);
+    } else if (faction === 'paper') {
+      g.fillRect(x - size, y - size * 1.2, size * 2, size * 2.4);
+    } else {
+      g.lineStyle(Math.max(2, size * 0.55), color, alpha)
+        .lineBetween(x - size, y - size, x + size, y + size)
+        .lineBetween(x + size, y - size, x - size, y + size);
     }
   }
 }

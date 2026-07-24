@@ -2,6 +2,34 @@ import { GAME_CONFIG, validateConfig } from './gameConfig';
 import { distance } from '../math/vector';
 
 describe('game configuration', () => {
+  it('matches solo player speed to AI and uses the approved dash tuning', () => {
+    expect(GAME_CONFIG.playerMovement).toMatchObject({
+      baseSwarmSpeed: GAME_CONFIG.units.motion.maxSpeed,
+      speedBonusPerUnit: 0.02,
+      maxSwarmSpeedBonus: 0.45,
+    });
+    expect(GAME_CONFIG.swarm).toMatchObject({
+      cohesion: 0.46,
+      separationRadius: 30,
+      maxDistance: 170,
+      offsetRadius: 38,
+      arrivalRadius: 10,
+      returnStrength: 2.8,
+      idleSpeedMultiplier: 0.45,
+    });
+    expect(GAME_CONFIG.dash).toMatchObject({
+      speedMultiplier: 3.4,
+      durationMs: 720,
+      cooldownMs: 2400,
+    });
+    expect(GAME_CONFIG.minimap).toMatchObject({
+      dashBarHeight: 4,
+      dashBarGap: 6,
+      dashLabelGap: 2,
+      dashLabelFontSize: 9,
+    });
+  });
+
   it('contains balanced positive combat values and integer populations', () => {
     expect(() => validateConfig(GAME_CONFIG)).not.toThrow();
     expect(GAME_CONFIG.combat.advantageDamage).toBeGreaterThan(
@@ -80,7 +108,7 @@ describe('game configuration', () => {
     expect(() =>
       validateConfig({
         ...GAME_CONFIG,
-        minimap: { ...GAME_CONFIG.minimap, neutralMarkerAlpha: 1.1 },
+        minimap: { ...GAME_CONFIG.minimap, neutralMarkerAlpha: Number.NaN },
       }),
     ).toThrow(/neutralMarkerAlpha/);
     expect(() =>
@@ -89,6 +117,54 @@ describe('game configuration', () => {
         landmarks: { shrine: { x: GAME_CONFIG.world.width + 1, y: 0 } },
       }),
     ).toThrow(/landmarks.shrine/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        shrine: { ...GAME_CONFIG.shrine, sacrificeRatio: 1 },
+      }),
+    ).toThrow(/sacrificeRatio/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        shrine: { ...GAME_CONFIG.shrine, sacrificeRatio: 0.9 },
+      }),
+    ).toThrow(/survivor/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        shrine: { ...GAME_CONFIG.shrine, channelSpeedMultiplier: 1.1 },
+      }),
+    ).toThrow(/channelSpeedMultiplier/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        shrine: { ...GAME_CONFIG.shrine, effectParticleCount: 2.5 },
+      }),
+    ).toThrow(/effectParticleCount/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        playerMovement: { ...GAME_CONFIG.playerMovement, speedBonusPerUnit: -0.1 },
+      }),
+    ).toThrow(/speedBonusPerUnit/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        swarm: { ...GAME_CONFIG.swarm, idleSpeedMultiplier: 0 },
+      }),
+    ).toThrow(/idleSpeedMultiplier/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        dash: { ...GAME_CONFIG.dash, minimumInputMagnitude: 1.1 },
+      }),
+    ).toThrow(/minimumInputMagnitude/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        dash: { ...GAME_CONFIG.dash, particleCount: 1.5 },
+      }),
+    ).toThrow(/particleCount/);
   });
 
   it('keeps the fixed meadow trees inside the playable boundary without overlap', () => {
