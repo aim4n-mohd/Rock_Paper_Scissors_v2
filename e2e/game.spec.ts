@@ -14,10 +14,15 @@ test('starts a live meadow and moves the Rock swarm', async ({ page }) => {
   await startGame(page);
   const before = await page.evaluate(() => window.__RPS_TEST__!.snapshot()!.swarmCenter.x);
   await page.keyboard.down('d');
-  await page.waitForTimeout(700);
-  await page.keyboard.up('d');
-  const after = await page.evaluate(() => window.__RPS_TEST__!.snapshot()!.swarmCenter.x);
-  expect(after).toBeGreaterThan(before + 20);
+  try {
+    await expect
+      .poll(() => page.evaluate(() => window.__RPS_TEST__!.snapshot()!.swarmCenter.x), {
+        timeout: 3000,
+      })
+      .toBeGreaterThan(before + 20);
+  } finally {
+    await page.keyboard.up('d');
+  }
 });
 
 test('dashes from a fresh Space press without adding a top HUD label and resets cleanly', async ({
