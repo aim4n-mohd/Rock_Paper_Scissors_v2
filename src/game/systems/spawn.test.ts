@@ -1,6 +1,19 @@
 import { GAME_CONFIG } from '../config/gameConfig';
+import { getMapDefinition } from '../maps/maps';
 import { distance } from '../math/vector';
 import { createInitialUnits } from './spawn';
+
+function insideRegion(
+  position: { x: number; y: number },
+  region: { x: number; y: number; width: number; height: number },
+) {
+  return (
+    position.x >= region.x &&
+    position.y >= region.y &&
+    position.x <= region.x + region.width &&
+    position.y <= region.y + region.height
+  );
+}
 
 describe('deterministic population spawning', () => {
   it('creates exact counts with one recruited Rock and valid positions', () => {
@@ -33,5 +46,21 @@ describe('deterministic population spawning', () => {
     expect(createInitialUnits(7).map((unit) => unit.position)).not.toEqual(
       createInitialUnits(8).map((unit) => unit.position),
     );
+  });
+
+  it('intermixes independent factions across the maps valid spawn regions', () => {
+    const map = getMapDefinition('meadow');
+    const units = createInitialUnits(42, map);
+
+    for (const faction of ['rock', 'paper', 'scissors'] as const) {
+      const independent = units.filter((unit) => unit.faction === faction && !unit.recruited);
+      expect(
+        independent.some(
+          (unit) =>
+            !map.spawnRegions[faction].some((region) => insideRegion(unit.position, region)),
+        ),
+        faction,
+      ).toBe(true);
+    }
   });
 });

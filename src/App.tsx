@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
+import { FACTIONS, type Faction } from './game/config/factions';
 import { GAME_CONFIG } from './game/config/gameConfig';
 import { gameBridge } from './game/events/gameBridge';
 import { GameCanvas } from './game/GameCanvas';
+import { MAPS, type MapId } from './game/maps/maps';
 import type { GameSnapshot } from './game/simulation/Simulation';
 import './styles.css';
 
 const INITIAL_SNAPSHOT: GameSnapshot = {
   status: 'active',
+  mapId: 'meadow',
   playerFaction: 'rock',
   counts: { ...GAME_CONFIG.population },
   elapsedMs: 0,
@@ -16,9 +19,10 @@ const INITIAL_SNAPSHOT: GameSnapshot = {
     status: 'available',
     channelProgressMs: 0,
     channelDurationMs: GAME_CONFIG.shrine.channelDurationMs,
-    usesRemaining: GAME_CONFIG.shrine.maxUses,
+    usesRemaining: GAME_CONFIG.shrine.usesPerMatch,
     movementPenaltyRemainingMs: 0,
     transformationEffectRemainingMs: 0,
+    cancelledFeedbackRemainingMs: 0,
     inRange: true,
     canActivate: false,
     sacrificePreview: 1,
@@ -30,13 +34,20 @@ const INITIAL_SNAPSHOT: GameSnapshot = {
     direction: { x: 0, y: 0 },
     activeRemainingMs: 0,
     cooldownRemainingMs: 0,
-    cooldownMs: GAME_CONFIG.dash.cooldownMs,
+    cooldownMs:
+      GAME_CONFIG.dash.baseCooldownMs * GAME_CONFIG.factionPassives.rock.dashCooldownMultiplier,
   },
 };
 
-function factionLabel(faction: 'rock' | 'paper' | 'scissors'): string {
+function factionLabel(faction: Faction): string {
   return faction[0]!.toUpperCase() + faction.slice(1);
 }
+
+const FACTION_SYMBOLS: Record<Faction, string> = {
+  rock: '●',
+  paper: '▰',
+  scissors: '✂',
+};
 
 function timeLabel(elapsedMs: number): string {
   const totalSeconds = Math.floor(elapsedMs / 1000);
@@ -48,6 +59,7 @@ export function App() {
   const [snapshot, setSnapshot] = useState(INITIAL_SNAPSHOT);
   const [gameError, setGameError] = useState<string>();
   const [gameAttempt, setGameAttempt] = useState(0);
+  const [selectedMapId, setSelectedMapId] = useState<MapId>('meadow');
 
   useEffect(() => gameBridge.subscribe(setSnapshot), []);
 
@@ -101,19 +113,38 @@ export function App() {
     <main className="app-shell">
       <section className="game-frame" aria-label="Rock Paper Scissors game">
         {started ? (
-          <GameCanvas key={gameAttempt} onError={setGameError} />
+          <GameCanvas
+            key={`${gameAttempt}-${selectedMapId}`}
+            mapId={selectedMapId}
+            onError={setGameError}
+          />
         ) : (
           <div className="meadow-placeholder" data-testid="game-container" />
         )}
         {started && (
           <header className="hud" aria-label="Match status">
-            <span className="rock-count">
+            <span
+              key={`rock-${snapshot.playerFaction === 'rock' ? snapshot.recruitedCount : 'idle'}`}
+              className={`rock-count ${snapshot.playerFaction === 'rock' ? 'hud-count-pulse' : ''}`}
+            >
               Rocks <strong>{snapshot.counts.rock}</strong>
             </span>
-            <span className="paper-count">
+            <span
+              key={`paper-${snapshot.playerFaction === 'paper' ? snapshot.recruitedCount : 'idle'}`}
+              className={`paper-count ${
+                snapshot.playerFaction === 'paper' ? 'hud-count-pulse' : ''
+              }`}
+            >
               Papers <strong>{snapshot.counts.paper}</strong>
             </span>
-            <span className="scissors-count">
+            <span
+              key={`scissors-${
+                snapshot.playerFaction === 'scissors' ? snapshot.recruitedCount : 'idle'
+              }`}
+              className={`scissors-count ${
+                snapshot.playerFaction === 'scissors' ? 'hud-count-pulse' : ''
+              }`}
+            >
               Scissors <strong>{snapshot.counts.scissors}</strong>
             </span>
             <span className="timer">
@@ -127,8 +158,30 @@ export function App() {
             aria-label="Triad Shrine"
           >
             <strong>Triad Shrine</strong>
-            {snapshot.shrine.status === 'used' ? (
-              <span>Shrine spent</span>
+            <div className="shrine-factions" role="group" aria-label="Choose shrine faction">
+              {FACTIONS.map((faction) => (
+                <button
+                  key={faction}
+                  type="button"
+                  aria-label={factionLabel(faction)}
+                  aria-pressed={snapshot.shrine.selectedFaction === faction}
+                  disabled={faction === snapshot.playerFaction || snapshot.shrine.status === 'used'}
+                  onClick={() => gameBridge.selectShrineFaction(faction)}
+                >
+                  <span aria-hidden="true">{FACTION_SYMBOLS[faction]}</span>
+                  {factionLabel(faction)}
+                </button>
+              ))}
+            </div>
+            {snapshot.shrine.transformationEffectRemainingMs > 0 ? (
+              <span className="shrine-transforming">
+                Transforming into{' '}
+                {snapshot.shrine.selectedFaction
+                  ? factionLabel(snapshot.shrine.selectedFaction)
+                  : factionLabel(snapshot.playerFaction)}
+              </span>
+            ) : snapshot.shrine.status === 'used' ? (
+              <span>Shrine dormant</span>
             ) : (
               <>
                 <span>
@@ -149,6 +202,9 @@ export function App() {
                 <span>
                   Sacrifice {snapshot.shrine.sacrificePreview} of {snapshot.recruitedCount}
                 </span>
+                {snapshot.shrine.cancelledFeedbackRemainingMs > 0 && (
+                  <span className="shrine-cancelled">Channel cancelled</span>
+                )}
                 {snapshot.shrine.status === 'channeling' && (
                   <progress
                     aria-label="Shrine channel"
@@ -165,6 +221,24 @@ export function App() {
               <span className="shrine-penalty">Transformation fatigue</span>
             )}
           </aside>
+        )}
+        {started && !gameError && import.meta.env.DEV && (
+          <label className="development-map-selector">
+            Development map
+            <select
+              value={selectedMapId}
+              onChange={(event) => {
+                gameBridge.clearInput();
+                setSelectedMapId(event.target.value as MapId);
+              }}
+            >
+              {MAPS.map((map) => (
+                <option key={map.id} value={map.id}>
+                  {map.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
         {!started && (
           <div className="overlay">

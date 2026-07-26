@@ -10,6 +10,7 @@ const SHRINE_SNAPSHOT = {
   usesRemaining: 1,
   movementPenaltyRemainingMs: 0,
   transformationEffectRemainingMs: 0,
+  cancelledFeedbackRemainingMs: 0,
   inRange: false,
   canActivate: false,
   sacrificePreview: 1,
@@ -22,13 +23,13 @@ const DASH_SNAPSHOT = {
   direction: { x: 0, y: 0 },
   activeRemainingMs: 0,
   cooldownRemainingMs: 0,
-  cooldownMs: 2400,
+  cooldownMs: 1200,
 };
 
 vi.mock('./game/GameCanvas', () => ({
-  GameCanvas: ({ onError }: { onError?: (message: string) => void }) => (
+  GameCanvas: ({ onError, mapId }: { onError?: (message: string) => void; mapId: string }) => (
     <>
-      <div data-testid="phaser-game" />
+      <div data-testid="phaser-game" data-map-id={mapId} />
       <button type="button" onClick={() => onError?.('Renderer failed')}>
         Simulate game failure
       </button>
@@ -53,6 +54,7 @@ describe('application shell', () => {
     act(() =>
       gameBridge.publish({
         status: 'paused',
+        mapId: 'meadow',
         playerFaction: 'rock',
         counts: { rock: 14, paper: 11, scissors: 15 },
         elapsedMs: 1200,
@@ -84,6 +86,7 @@ describe('application shell', () => {
       restart,
       killFaction: vi.fn(),
       cycleShrineSelection,
+      selectShrineFaction: vi.fn(),
       requestDash,
     });
     render(<App />);
@@ -124,6 +127,7 @@ describe('application shell', () => {
     act(() =>
       gameBridge.publish({
         status: 'active',
+        mapId: 'meadow',
         playerFaction: 'paper',
         counts: { rock: 4, paper: 8, scissors: 6 },
         elapsedMs: 1000,
@@ -154,6 +158,73 @@ describe('application shell', () => {
       'aria-valuenow',
       '50',
     );
+    expect(screen.getByRole('button', { name: 'Paper' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Scissors' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('supports pointer selection and exposes cancelled, transforming, and dormant states', async () => {
+    const selectShrineFaction = vi.fn();
+    gameBridge.bindController({
+      togglePause: vi.fn(),
+      restart: vi.fn(),
+      killFaction: vi.fn(),
+      cycleShrineSelection: vi.fn(),
+      selectShrineFaction,
+      requestDash: vi.fn(),
+    });
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /start game/i }));
+    act(() =>
+      gameBridge.publish({
+        status: 'active',
+        mapId: 'meadow',
+        playerFaction: 'rock',
+        counts: { rock: 6, paper: 4, scissors: 5 },
+        elapsedMs: 1000,
+        recruitedCount: 5,
+        swarmCenter: { x: 1440, y: 810 },
+        shrine: {
+          ...SHRINE_SNAPSHOT,
+          selectedFaction: 'paper',
+          inRange: true,
+          canActivate: true,
+          cancelledFeedbackRemainingMs: 500,
+        },
+        dash: DASH_SNAPSHOT,
+      }),
+    );
+
+    expect(screen.getByRole('button', { name: 'Rock' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Scissors' }));
+    expect(selectShrineFaction).toHaveBeenCalledWith('scissors');
+    expect(screen.getByLabelText(/triad shrine/i)).toHaveTextContent('Channel cancelled');
+
+    act(() =>
+      gameBridge.publish({
+        ...gameBridge.latest!,
+        shrine: {
+          ...gameBridge.latest!.shrine,
+          status: 'used',
+          transformationEffectRemainingMs: 500,
+          cancelledFeedbackRemainingMs: 0,
+        },
+      }),
+    );
+    expect(screen.getByLabelText(/triad shrine/i)).toHaveTextContent('Transforming into Paper');
+
+    act(() =>
+      gameBridge.publish({
+        ...gameBridge.latest!,
+        shrine: {
+          ...gameBridge.latest!.shrine,
+          transformationEffectRemainingMs: 0,
+        },
+      }),
+    );
+    expect(screen.getByLabelText(/triad shrine/i)).toHaveTextContent('Shrine dormant');
   });
 
   it('does not consume or dispatch Space before active gameplay starts', () => {
@@ -163,11 +234,23 @@ describe('application shell', () => {
       restart: vi.fn(),
       killFaction: vi.fn(),
       cycleShrineSelection: vi.fn(),
+      selectShrineFaction: vi.fn(),
       requestDash,
     });
     render(<App />);
 
     expect(fireEvent.keyDown(window, { key: ' ', code: 'Space' })).toBe(true);
     expect(requestDash).not.toHaveBeenCalled();
+  });
+
+  it('offers a development map selector and remounts the selected arena', async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole('button', { name: /start game/i }));
+
+    expect(screen.getByTestId('phaser-game')).toHaveAttribute('data-map-id', 'meadow');
+    await userEvent.selectOptions(screen.getByLabelText(/development map/i), 'forest');
+    expect(screen.getByTestId('phaser-game')).toHaveAttribute('data-map-id', 'forest');
+    await userEvent.selectOptions(screen.getByLabelText(/development map/i), 'marsh');
+    expect(screen.getByTestId('phaser-game')).toHaveAttribute('data-map-id', 'marsh');
   });
 });

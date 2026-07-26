@@ -9,13 +9,17 @@ vi.mock('phaser', () => ({
     Math: {
       Clamp: (value: number, min: number, max: number) => Math.min(max, Math.max(min, value)),
       Linear: (start: number, end: number, amount: number) => start + (end - start) * amount,
+      Distance: {
+        Between: (x1: number, y1: number, x2: number, y2: number) => Math.hypot(x2 - x1, y2 - y1),
+      },
     },
   },
 }));
 
 import { GAME_CONFIG } from '../config/gameConfig';
 import { gameBridge } from '../events/gameBridge';
-import { MeadowScene } from './MeadowScene';
+import { getMapDefinition } from '../maps/maps';
+import { ArenaScene } from './ArenaScene';
 
 function graphicsDouble() {
   const graphics: Record<string, ReturnType<typeof vi.fn>> = {};
@@ -31,6 +35,10 @@ function graphicsDouble() {
     'fillRoundedRect',
     'lineBetween',
     'beginPath',
+    'moveTo',
+    'lineTo',
+    'closePath',
+    'fillPath',
     'arc',
     'strokePath',
     'setDepth',
@@ -50,18 +58,23 @@ function textDouble() {
   return text;
 }
 
-describe('MeadowScene lifecycle', () => {
+describe('ArenaScene lifecycle', () => {
   afterEach(() => gameBridge.reset());
 
   it('creates, updates, publishes, and detaches its bridge controller on shutdown', () => {
-    const scene = new MeadowScene();
+    const scene = new ArenaScene('forest', 12);
+    const map = getMapDefinition('forest');
     const worldGraphics = graphicsDouble();
     const actorGraphics = graphicsDouble();
     const minimapStaticGraphics = graphicsDouble();
     const minimapDynamicGraphics = graphicsDouble();
     const dashLabel = textDouble();
     const setBounds = vi.fn();
-    const camera = { setBounds, scrollX: 0, scrollY: 0, zoom: 1 };
+    const setZoom = vi.fn((zoom: number) => {
+      camera.zoom = zoom;
+      return camera;
+    });
+    const camera = { setBounds, setZoom, shake: vi.fn(), scrollX: 0, scrollY: 0, zoom: 1 };
     let shutdown: (() => void) | undefined;
     const originalBindController = gameBridge.bindController.bind(gameBridge);
     const releaseController = vi.fn();
@@ -86,6 +99,7 @@ describe('MeadowScene lifecycle', () => {
         text: vi.fn().mockReturnValue(dashLabel),
       },
       events: {
+        emit: vi.fn(),
         once: vi.fn((event: string, callback: () => void) => {
           if (event === phaserMocks.shutdown) shutdown = callback;
         }),
@@ -93,8 +107,14 @@ describe('MeadowScene lifecycle', () => {
     });
 
     scene.create();
-    expect(setBounds).toHaveBeenCalledWith(0, 0, GAME_CONFIG.world.width, GAME_CONFIG.world.height);
-    expect(gameBridge.latest?.counts).toEqual(GAME_CONFIG.population);
+    expect(setBounds).toHaveBeenCalledWith(
+      map.cameraBounds.x,
+      map.cameraBounds.y,
+      map.cameraBounds.width,
+      map.cameraBounds.height,
+    );
+    expect(gameBridge.latest?.counts).toEqual(map.populationRecommendation);
+    expect(gameBridge.latest?.mapId).toBe('forest');
 
     gameBridge.setKey('d', true);
     gameBridge.requestDash();
@@ -103,14 +123,18 @@ describe('MeadowScene lifecycle', () => {
     scene.update(0, 100);
     expect(actorGraphics.clear).toHaveBeenCalled();
     expect(actorGraphics.strokeCircle).toHaveBeenCalledWith(
-      GAME_CONFIG.landmarks.shrine.x,
-      GAME_CONFIG.landmarks.shrine.y,
+      map.shrine.x,
+      map.shrine.y,
       GAME_CONFIG.shrine.activationRadius,
     );
     expect(minimapDynamicGraphics.clear).toHaveBeenCalled();
     expect(gameBridge.latest?.elapsedMs).toBe(100);
     expect(Number.isFinite(camera.scrollX)).toBe(true);
     expect(Number.isFinite(camera.scrollY)).toBe(true);
+    const visualRadius = (Math.hypot(16, 16) / 2) * 1.5;
+    expect(gameBridge.latest!.swarmCenter.x + visualRadius).toBeLessThanOrEqual(
+      camera.scrollX + GAME_CONFIG.viewport.width / camera.zoom - 24,
+    );
 
     expect(shutdown).toBeTypeOf('function');
     shutdown?.();

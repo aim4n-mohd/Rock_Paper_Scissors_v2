@@ -8,6 +8,7 @@ describe('game bridge', () => {
     const unsubscribe = gameBridge.subscribe(listener);
     gameBridge.publish({
       status: 'active',
+      mapId: 'meadow',
       playerFaction: 'rock',
       counts: { rock: 3, paper: 2, scissors: 1 },
       elapsedMs: 100,
@@ -20,6 +21,7 @@ describe('game bridge', () => {
         usesRemaining: 1,
         movementPenaltyRemainingMs: 0,
         transformationEffectRemainingMs: 0,
+        cancelledFeedbackRemainingMs: 0,
         inRange: false,
         canActivate: false,
         sacrificePreview: 1,
@@ -38,6 +40,7 @@ describe('game bridge', () => {
     unsubscribe();
     gameBridge.publish({
       status: 'paused',
+      mapId: 'meadow',
       playerFaction: 'rock',
       counts: { rock: 3, paper: 2, scissors: 1 },
       elapsedMs: 100,
@@ -56,6 +59,7 @@ describe('game bridge', () => {
       restart: vi.fn(),
       killFaction: vi.fn(),
       cycleShrineSelection: vi.fn(),
+      selectShrineFaction: vi.fn(),
       requestDash: vi.fn(),
     });
     gameBridge.setKey('d', true);
@@ -73,6 +77,7 @@ describe('game bridge', () => {
       restart,
       killFaction: vi.fn(),
       cycleShrineSelection: vi.fn(),
+      selectShrineFaction: vi.fn(),
       requestDash: vi.fn(),
     });
     gameBridge.setKey('d', true);
@@ -93,6 +98,7 @@ describe('game bridge', () => {
       restart: vi.fn(),
       killFaction: vi.fn(),
       cycleShrineSelection: vi.fn(),
+      selectShrineFaction: vi.fn(),
       requestDash: vi.fn(),
     });
     const releaseSecond = gameBridge.bindController({
@@ -100,6 +106,7 @@ describe('game bridge', () => {
       restart: vi.fn(),
       killFaction: vi.fn(),
       cycleShrineSelection: vi.fn(),
+      selectShrineFaction: vi.fn(),
       requestDash: vi.fn(),
     });
 
@@ -123,6 +130,7 @@ describe('game bridge', () => {
       restart: vi.fn(),
       killFaction: vi.fn(),
       cycleShrineSelection: vi.fn(),
+      selectShrineFaction: vi.fn(),
       requestDash,
     });
     gameBridge.setKey('d', true);
@@ -131,5 +139,22 @@ describe('game bridge', () => {
 
     expect(requestDash).toHaveBeenCalledOnce();
     expect(gameBridge.input).toEqual({ x: 1, y: 0 });
+  });
+
+  it('forwards an explicit pointer shrine selection to the active controller', () => {
+    const selectShrineFaction = vi.fn();
+    gameBridge.bindController({
+      togglePause: vi.fn(),
+      restart: vi.fn(),
+      killFaction: vi.fn(),
+      cycleShrineSelection: vi.fn(),
+      selectShrineFaction,
+      requestDash: vi.fn(),
+    });
+
+    gameBridge.selectShrineFaction('scissors');
+
+    expect(selectShrineFaction).toHaveBeenCalledOnce();
+    expect(selectShrineFaction).toHaveBeenCalledWith('scissors');
   });
 });

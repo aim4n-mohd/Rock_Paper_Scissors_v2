@@ -1,11 +1,11 @@
-import { getPredator, getPrey } from '../config/factions';
+import { getPredator, getPrey, type Faction } from '../config/factions';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { createUnit } from '../model/unit';
 import { calculateShrineSacrificeCount } from '../systems/shrine';
-import { Simulation } from './Simulation';
+import { Simulation, type SimulationOptions } from './Simulation';
 
-function preparedSimulation(recruitedCount = 5): Simulation {
-  const simulation = new Simulation(41);
+function preparedSimulation(recruitedCount = 5, options: SimulationOptions = {}): Simulation {
+  const simulation = new Simulation(41, options);
   const shrine = GAME_CONFIG.landmarks.shrine;
   const recruited = Array.from({ length: recruitedCount }, (_, index) =>
     createUnit(
@@ -35,7 +35,7 @@ function advance(
     simulation.update(Math.min(250, durationMs - elapsed), input, interactionHeld);
 }
 
-function activate(simulation: Simulation, faction: 'paper' | 'scissors' = 'paper'): void {
+function activate(simulation: Simulation, faction: Faction = 'paper'): void {
   expect(simulation.selectShrineFaction(faction)).toBe(true);
   advance(simulation, GAME_CONFIG.shrine.channelDurationMs, true);
   expect(simulation.snapshot().shrine.status).toBe('used');
@@ -110,6 +110,94 @@ describe('Triad Shrine integration', () => {
     expect(simulation.snapshot().shrine.selectedFaction).toBeUndefined();
   });
 
+  it('allows either opposing faction to be selected explicitly', () => {
+    const simulation = preparedSimulation();
+
+    expect(simulation.selectShrineFaction('paper')).toBe(true);
+    expect(simulation.snapshot().shrine.selectedFaction).toBe('paper');
+    expect(simulation.selectShrineFaction('scissors')).toBe(true);
+    expect(simulation.snapshot().shrine.selectedFaction).toBe('scissors');
+  });
+
+  it('safely transforms between every ordered pair of different factions', () => {
+    const pairs = [
+      ['rock', 'paper'],
+      ['rock', 'scissors'],
+      ['paper', 'rock'],
+      ['paper', 'scissors'],
+      ['scissors', 'rock'],
+      ['scissors', 'paper'],
+    ] as const;
+
+    for (const [source, target] of pairs) {
+      const simulation = preparedSimulation();
+      simulation.playerFaction = source;
+      for (const unit of simulation.units.filter((candidate) => candidate.recruited))
+        unit.faction = source;
+
+      activate(simulation, target);
+
+      expect(simulation.playerFaction).toBe(target);
+      expect(
+        simulation.units
+          .filter((unit) => unit.alive && unit.recruited)
+          .every((unit) => unit.faction === target),
+      ).toBe(true);
+      expect(simulation.snapshot().dash.cooldownMs).toBe(
+        GAME_CONFIG.dash.baseCooldownMs *
+          GAME_CONFIG.factionPassives[target].dashCooldownMultiplier,
+      );
+    }
+  });
+
+  it('reports a temporary cancelled state after leaving during a channel', () => {
+    const simulation = preparedSimulation();
+    simulation.selectShrineFaction('paper');
+    advance(simulation, 500, true);
+    simulation.units.find((candidate) => candidate.recruited)!.position.x +=
+      GAME_CONFIG.shrine.activationRadius + 100;
+
+    advance(simulation, GAME_CONFIG.simulation.fixedStepMs, true);
+
+    expect(simulation.snapshot().shrine.cancelledFeedbackRemainingMs).toBeGreaterThan(0);
+  });
+
+  it('does not cancel for disadvantage damage', () => {
+    const simulation = preparedSimulation();
+    simulation.selectShrineFaction('paper');
+    advance(simulation, 500, true);
+    const anchor = simulation.units.find((unit) => unit.id === simulation.anchorId)!;
+    const disadvantagedAttacker = simulation.units.find((unit) => unit.id === 'other-enemy')!;
+    disadvantagedAttacker.position = { ...anchor.position };
+
+    advance(simulation, GAME_CONFIG.simulation.fixedStepMs, true);
+
+    expect(anchor.health).toBeLessThan(anchor.maxHealth);
+    expect(simulation.snapshot().shrine.status).toBe('channeling');
+    expect(simulation.snapshot().shrine.channelProgressMs).toBeGreaterThan(500);
+  });
+
+  it('can be configured to cancel for disadvantage damage', () => {
+    const simulation = preparedSimulation(5, {
+      shrine: {
+        interruptOnDisadvantageDamage: true,
+        highDamageInterruptThreshold: GAME_CONFIG.combat.disadvantageDamage,
+      },
+    });
+    simulation.selectShrineFaction('paper');
+    advance(simulation, 500, true);
+    const anchor = simulation.units.find((unit) => unit.id === simulation.anchorId)!;
+    simulation.units.find((unit) => unit.id === 'other-enemy')!.position = {
+      ...anchor.position,
+    };
+
+    advance(simulation, GAME_CONFIG.simulation.fixedStepMs, true);
+
+    expect(simulation.snapshot().shrine.status).toBe('available');
+    expect(simulation.snapshot().shrine.channelProgressMs).toBe(0);
+    expect(simulation.snapshot().shrine.cancelledFeedbackRemainingMs).toBeGreaterThan(0);
+  });
+
   it('calculates the configured sacrifice percentage rounded up', () => {
     expect(calculateShrineSacrificeCount(5, 0.2)).toBe(1);
     expect(calculateShrineSacrificeCount(6, 0.2)).toBe(2);
@@ -125,6 +213,7 @@ describe('Triad Shrine integration', () => {
     expect(livingRecruited).toHaveLength(4);
     expect(livingRecruited.every((unit) => unit.faction === 'paper')).toBe(true);
     expect(simulation.particles.some((particle) => particle.effect === 'shrine')).toBe(true);
+    expect(simulation.particles.some((particle) => particle.effect === 'shrine-death')).toBe(true);
   });
 
   it('keeps transformed survivors recruited', () => {
@@ -150,6 +239,28 @@ describe('Triad Shrine integration', () => {
     expect(getPredator(simulation.playerFaction)).toBe('scissors');
   });
 
+  it('updates faction passives, dash cooldown, and recruitment radius immediately', () => {
+    const simulation = preparedSimulation();
+
+    activate(simulation, 'scissors');
+
+    expect(simulation.snapshot().dash.cooldownMs).toBe(
+      GAME_CONFIG.dash.baseCooldownMs * GAME_CONFIG.factionPassives.scissors.dashCooldownMultiplier,
+    );
+    const transformedCount = simulation.units.filter(
+      (unit) => unit.alive && unit.recruited && unit.faction === 'scissors',
+    ).length;
+    expect(simulation.currentRecruitmentRadius()).toBe(
+      GAME_CONFIG.recruitment.baseRadius +
+        Math.max(0, transformedCount - 1) * GAME_CONFIG.recruitment.radiusBonusPerUnit,
+    );
+    expect(
+      simulation.units
+        .filter((unit) => unit.alive && unit.recruited)
+        .every((unit) => unit.faction === 'scissors'),
+    ).toBe(true);
+  });
+
   it('recruits nearby neutral units of the transformed faction', () => {
     const simulation = preparedSimulation();
     activate(simulation, 'paper');
@@ -170,6 +281,29 @@ describe('Triad Shrine integration', () => {
     expect(formerAlly.faction).toBe('rock');
     expect(formerAlly.recruited).toBe(false);
     expect(formerAlly.intent).not.toBe('player');
+    formerAlly.position = { ...simulation.swarmCenter() };
+    advance(simulation, GAME_CONFIG.simulation.fixedStepMs, false);
+    expect(formerAlly.recruited).toBe(false);
+  });
+
+  it('clears stale targeting for every independent unit after switching', () => {
+    const simulation = preparedSimulation();
+    for (const unit of simulation.units.filter((candidate) => !candidate.recruited)) {
+      unit.targetId = simulation.anchorId;
+      unit.aiMemory.active = {
+        intent: 'chase',
+        direction: { x: 1, y: 0 },
+        targetId: simulation.anchorId,
+      };
+    }
+
+    activate(simulation, 'paper');
+
+    expect(
+      simulation.units
+        .filter((unit) => unit.alive && !unit.recruited)
+        .every((unit) => unit.targetId === undefined && unit.aiMemory.active === undefined),
+    ).toBe(true);
   });
 
   it('publishes current player faction, transformed counts, and sacrifice preview', () => {
@@ -232,7 +366,7 @@ describe('Triad Shrine integration', () => {
     expect(simulation.snapshot().shrine).toMatchObject({
       status: 'available',
       channelProgressMs: 0,
-      usesRemaining: GAME_CONFIG.shrine.maxUses,
+      usesRemaining: GAME_CONFIG.shrine.usesPerMatch,
       movementPenaltyRemainingMs: 0,
     });
     expect(simulation.snapshot().shrine.selectedFaction).toBeUndefined();
@@ -272,7 +406,7 @@ describe('Triad Shrine integration', () => {
     const penalizedStart = penalized.swarmCenter().x;
     const unpenalizedStart = unpenalized.swarmCenter().x;
     expect(penalized.currentEffectiveSwarmSpeed()).toBeCloseTo(
-      unpenalized.currentEffectiveSwarmSpeed() * GAME_CONFIG.shrine.postTransformSpeedMultiplier,
+      unpenalized.currentEffectiveSwarmSpeed() * GAME_CONFIG.shrine.postTransformMovementMultiplier,
     );
 
     advance(penalized, 500, false, { x: 1, y: 0 });
@@ -281,5 +415,17 @@ describe('Triad Shrine integration', () => {
     expect(penalized.swarmCenter().x - penalizedStart).toBeLessThan(
       unpenalized.swarmCenter().x - unpenalizedStart,
     );
+  });
+
+  it('supports a disabled tutorial override and preserves it across restart', () => {
+    const simulation = new Simulation(41, { shrine: { enabled: false } });
+
+    expect(simulation.snapshot().shrine.usesRemaining).toBe(0);
+    expect(simulation.selectShrineFaction('paper')).toBe(false);
+
+    simulation.restart(42);
+
+    expect(simulation.snapshot().shrine.usesRemaining).toBe(0);
+    expect(simulation.snapshot().shrine.status).toBe('used');
   });
 });

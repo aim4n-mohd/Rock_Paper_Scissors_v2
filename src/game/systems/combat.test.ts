@@ -14,6 +14,24 @@ describe('combat resolution', () => {
     expect(scissors.knockback.x).toBeGreaterThan(0);
   });
 
+  it('applies Rock outgoing and incoming knockback passives independently', () => {
+    const rock = createUnit('rock', 'rock', { x: 0, y: 0 });
+    const scissors = createUnit('scissors', 'scissors', { x: 10, y: 0 });
+
+    resolveCombatPair(rock, scissors, 1000);
+
+    expect(Math.abs(scissors.knockback.x)).toBeCloseTo(
+      GAME_CONFIG.combat.baseKnockbackForce *
+        GAME_CONFIG.factionPassives.rock.outgoingKnockbackMultiplier,
+    );
+    expect(Math.abs(rock.knockback.x)).toBeCloseTo(
+      GAME_CONFIG.combat.baseKnockbackForce *
+        GAME_CONFIG.factionPassives.scissors.outgoingKnockbackMultiplier *
+        GAME_CONFIG.factionPassives.rock.incomingKnockbackMultiplier,
+    );
+    expect(Math.abs(scissors.knockback.x)).toBeGreaterThan(Math.abs(rock.knockback.x));
+  });
+
   it('enforces cooldown per attacker-target pair', () => {
     const rock = createUnit('rock', 'rock', { x: 0, y: 0 });
     const scissors = createUnit('scissors', 'scissors', { x: 10, y: 0 });

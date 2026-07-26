@@ -12,7 +12,7 @@ vi.mock('phaser', () => ({
   },
 }));
 
-vi.mock('./scenes/MeadowScene', () => ({ MeadowScene: class MeadowScene {} }));
+vi.mock('./scenes/ArenaScene', () => ({ ArenaScene: class ArenaScene {} }));
 
 import { GAME_CONFIG } from './config/gameConfig';
 import { createGame, createGameConfig } from './createGame';
@@ -29,10 +29,13 @@ describe('Phaser game factory', () => {
       pixelArt: true,
       antialias: false,
       roundPixels: true,
+      render: { antialias: false, pixelArt: true, roundPixels: true },
     });
 
     const game = createGame(parent);
     expect(phaserMocks.Game).toHaveBeenCalledOnce();
     expect(game).toBeInstanceOf(phaserMocks.Game);
+
+    expect(createGameConfig(parent, 'forest').backgroundColor).not.toBe(config.backgroundColor);
   });
 });

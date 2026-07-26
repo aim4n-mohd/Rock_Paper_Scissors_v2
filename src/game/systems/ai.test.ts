@@ -32,6 +32,16 @@ describe('independent AI priority', () => {
     });
   });
 
+  it('detects and pursues prey slightly beyond the previous perception range', () => {
+    const paper = createUnit('paper-hunter', 'paper', { x: 0, y: 0 });
+    const rock = createUnit('rock-prey', 'rock', { x: 205, y: 0 });
+
+    expect(decideIndependentMovement(paper, [paper, rock], { x: 0, y: 1 })).toMatchObject({
+      intent: 'chase',
+      targetId: 'rock-prey',
+    });
+  });
+
   it('moves toward a nearby ally before falling back to wandering', () => {
     const rock = createUnit('rock', 'rock', { x: 0, y: 0 });
     const ally = createUnit('ally', 'rock', { x: 80, y: 0 });

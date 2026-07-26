@@ -8,6 +8,7 @@ interface GameController {
   restart(): void;
   killFaction(faction: Faction): void;
   cycleShrineSelection(direction: -1 | 1): void;
+  selectShrineFaction(faction: Faction): void;
   requestDash(): void;
 }
 
@@ -67,6 +68,9 @@ class GameBridge {
   }
   cycleShrineSelection(direction: -1 | 1): void {
     this.controllers[this.controllers.length - 1]?.cycleShrineSelection(direction);
+  }
+  selectShrineFaction(faction: Faction): void {
+    this.controllers[this.controllers.length - 1]?.selectShrineFaction(faction);
   }
   requestDash(): void {
     this.controllers[this.controllers.length - 1]?.requestDash();

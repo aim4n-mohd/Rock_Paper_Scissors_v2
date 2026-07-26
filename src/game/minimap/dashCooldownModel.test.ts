@@ -4,7 +4,7 @@ import { calculateDashCooldownFill } from './dashCooldownModel';
 function dashSnapshot(
   phase: DashSnapshot['phase'],
   cooldownRemainingMs = 0,
-  cooldownMs = 2400,
+  cooldownMs = 1200,
 ): DashSnapshot {
   return {
     phase,
@@ -19,9 +19,9 @@ function dashSnapshot(
 describe('dash cooldown indicator model', () => {
   it.each([
     { state: dashSnapshot('active'), expected: 0 },
-    { state: dashSnapshot('cooldown', 2400), expected: 0 },
-    { state: dashSnapshot('cooldown', 1800), expected: 0.25 },
-    { state: dashSnapshot('cooldown', 1200), expected: 0.5 },
+    { state: dashSnapshot('cooldown', 1200), expected: 0 },
+    { state: dashSnapshot('cooldown', 900), expected: 0.25 },
+    { state: dashSnapshot('cooldown', 600), expected: 0.5 },
     { state: dashSnapshot('cooldown', 0), expected: 1 },
     { state: dashSnapshot('ready'), expected: 1 },
   ])('returns $expected fill for $state.phase', ({ state, expected }) => {

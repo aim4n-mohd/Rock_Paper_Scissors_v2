@@ -36,6 +36,11 @@ export interface Unit {
   knockback: Vector;
   knockbackRemainingMs: number;
   flashRemainingMs: number;
+  deathTransitionRemainingMs: number;
+  recruitEffectRemainingMs: number;
+  shrineTransformRemainingMs: number;
+  deathVelocity: Vector;
+  movementParticleCooldownMs: number;
   aiMemory: AiMemory;
   swarmOffset: Vector;
   swarmOffsetAssigned: boolean;
@@ -63,6 +68,11 @@ export function createUnit(
     knockback: vec(),
     knockbackRemainingMs: 0,
     flashRemainingMs: 0,
+    deathTransitionRemainingMs: 0,
+    recruitEffectRemainingMs: 0,
+    shrineTransformRemainingMs: 0,
+    deathVelocity: vec(),
+    movementParticleCooldownMs: 0,
     aiMemory: { nextDecisionAtMs: 0, sequence: 0 },
     swarmOffset: vec(),
     swarmOffsetAssigned: false,
@@ -74,6 +84,8 @@ export function damageUnit(unit: Unit, amount: number): boolean {
   unit.health = Math.max(0, unit.health - amount);
   unit.flashRemainingMs = 110;
   if (unit.health === 0) {
+    unit.deathVelocity = { ...unit.velocity };
+    unit.deathTransitionRemainingMs = GAME_CONFIG.visuals.animation.deathTransitionMs;
     unit.alive = false;
     unit.intent = 'dead';
     unit.velocity = vec();

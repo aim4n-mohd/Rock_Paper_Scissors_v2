@@ -41,8 +41,11 @@ test('shows shrine requirements and selects an eligible faction', async ({ page 
   await startGame(page);
   const shrine = page.getByLabel('Triad Shrine');
   await expect(shrine).toContainText('Need 4 recruited units');
+  await expect(shrine.getByRole('button', { name: 'Rock' })).toBeDisabled();
   await page.keyboard.press('e');
   await expect(shrine).toContainText('Selected Paper');
+  await shrine.getByRole('button', { name: 'Scissors' }).click();
+  await expect(shrine).toContainText('Selected Scissors');
   await page.keyboard.down('f');
   await page.waitForTimeout(250);
   await page.keyboard.up('f');
@@ -83,4 +86,19 @@ test('shows defeat only after every Rock is gone', async ({ page }) => {
   await startGame(page);
   await page.evaluate(() => window.__RPS_TEST__!.killFaction('rock'));
   await expect(page.getByRole('heading', { name: /rock swarm is gone/i })).toBeVisible();
+});
+
+test('development selector loads each arena and replaces the previous canvas', async ({ page }) => {
+  await startGame(page);
+  const selector = page.getByLabel('Development map');
+
+  await selector.selectOption('forest');
+  await expect
+    .poll(() => page.evaluate(() => window.__RPS_TEST__?.snapshot()?.mapId))
+    .toBe('forest');
+  await selector.selectOption('marsh');
+  await expect
+    .poll(() => page.evaluate(() => window.__RPS_TEST__?.snapshot()?.mapId))
+    .toBe('marsh');
+  await expect(page.locator('canvas')).toHaveCount(1);
 });

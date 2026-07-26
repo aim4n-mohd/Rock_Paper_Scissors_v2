@@ -22,6 +22,13 @@ describe('dash simulation integration', () => {
 
     expect(simulation.requestDash({ x: 1, y: 0 })).toBe(true);
     expect(simulation.snapshot().dash.phase).toBe('active');
+    expect(simulation.currentEffectiveSwarmSpeed()).toBeCloseTo(normalSpeed);
+    simulation.update(GAME_CONFIG.dash.accelerationInMs / 2, { x: 1, y: 0 });
+    expect(simulation.currentEffectiveSwarmSpeed()).toBeGreaterThan(normalSpeed);
+    expect(simulation.currentEffectiveSwarmSpeed()).toBeLessThan(
+      normalSpeed * GAME_CONFIG.dash.speedMultiplier,
+    );
+    simulation.update(GAME_CONFIG.dash.accelerationInMs, { x: 1, y: 0 });
     expect(simulation.currentEffectiveSwarmSpeed()).toBeCloseTo(
       normalSpeed * GAME_CONFIG.dash.speedMultiplier,
     );
@@ -32,6 +39,25 @@ describe('dash simulation integration', () => {
     });
     expect(simulation.snapshot().dash.phase).toBe('cooldown');
     expect(simulation.currentEffectiveSwarmSpeed()).toBeCloseTo(normalSpeed);
+  });
+
+  it('publishes the effective faction cooldown and gives Scissors the shorter cooldown', () => {
+    const rock = dashFixture().simulation;
+    const scissors = dashFixture().simulation;
+    scissors.playerFaction = 'scissors';
+    for (const unit of scissors.units.filter((candidate) => candidate.recruited))
+      unit.faction = 'scissors';
+
+    expect(rock.snapshot().dash.cooldownMs).toBe(GAME_CONFIG.dash.baseCooldownMs);
+    expect(scissors.snapshot().dash.cooldownMs).toBe(
+      GAME_CONFIG.dash.baseCooldownMs * GAME_CONFIG.factionPassives.scissors.dashCooldownMultiplier,
+    );
+
+    scissors.requestDash({ x: 1, y: 0 });
+    scissors.update(GAME_CONFIG.dash.durationMs, { x: 1, y: 0 });
+    expect(scissors.snapshot().dash.cooldownRemainingMs).toBeLessThanOrEqual(
+      scissors.snapshot().dash.cooldownMs,
+    );
   });
 
   it('rejects invalid, paused, active, and cooldown requests and freezes while paused', () => {
@@ -130,13 +156,13 @@ describe('dash simulation integration', () => {
     simulation.update(GAME_CONFIG.dash.durationMs, { x: 1, y: 0 });
     for (
       let elapsed = 0;
-      elapsed <= GAME_CONFIG.dash.cooldownMs;
+      elapsed <= GAME_CONFIG.dash.baseCooldownMs;
       elapsed += GAME_CONFIG.simulation.maxFrameMs
     ) {
       simulation.update(
         Math.min(
           GAME_CONFIG.simulation.maxFrameMs,
-          GAME_CONFIG.dash.cooldownMs - elapsed + GAME_CONFIG.simulation.fixedStepMs,
+          GAME_CONFIG.dash.baseCooldownMs - elapsed + GAME_CONFIG.simulation.fixedStepMs,
         ),
         { x: 1, y: 0 },
       );
