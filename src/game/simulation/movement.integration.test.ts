@@ -1,4 +1,5 @@
 import { GAME_CONFIG } from '../config/gameConfig';
+import { UNIT_FRAME_CONTRACT } from '../config/unitSpriteManifest';
 import { distance, magnitude } from '../math/vector';
 import { createUnit } from '../model/unit';
 import { Simulation } from './Simulation';
@@ -211,6 +212,28 @@ describe('responsive imperfect movement integration', () => {
     );
   });
 
+  it('lets pursuing AI modestly exceed its passive roaming speed', () => {
+    const simulation = new Simulation(517);
+    const hunter = createUnit('aggressive-paper', 'paper', { x: 1300, y: 600 });
+    const prey = createUnit('hunted-rock', 'rock', { x: 1470, y: 600 }, true);
+    const scissors = createUnit('far-scissors', 'scissors', { x: 2600, y: 1400 });
+    hunter.velocity = { x: hunter.motion.maxSpeed, y: 0 };
+    hunter.motion = {
+      ...hunter.motion,
+      reactionDelayMs: 0,
+      predictionTimeMs: 0,
+      predictionError: 0,
+    };
+    simulation.units = [hunter, prey, scissors];
+    simulation.anchorId = prey.id;
+
+    simulation.update(100, { x: 0, y: 0 });
+
+    expect(hunter.intent).toBe('chase');
+    expect(magnitude(hunter.velocity)).toBeGreaterThan(hunter.motion.maxSpeed);
+    expect(magnitude(hunter.velocity)).toBeLessThanOrEqual(hunter.motion.maxSpeed * 1.08);
+  });
+
   it('responds sharply to reversed input without an instantaneous velocity flip', () => {
     const { simulation, first } = playerFixture();
     simulation.update(180, { x: 1, y: 0 });
@@ -287,4 +310,35 @@ describe('responsive imperfect movement integration', () => {
       ),
     ).toBe(true);
   });
+
+  it('keeps the full animated unit footprint inside the right world edge', () => {
+    const simulation = new Simulation(619);
+    const rock = createUnit(
+      'right-edge-rock',
+      'rock',
+      {
+        x: simulation.map.world.width - simulation.map.world.padding - rockVisualRadius(),
+        y: simulation.map.world.height / 2,
+      },
+      true,
+    );
+    const paper = createUnit('right-edge-paper', 'paper', { x: 900, y: 700 });
+    const scissors = createUnit('right-edge-scissors', 'scissors', { x: 800, y: 700 });
+    rock.velocity = { x: 180, y: 0 };
+    simulation.units = [rock, paper, scissors];
+    simulation.anchorId = rock.id;
+
+    simulation.update(300, { x: 1, y: 0 });
+
+    expect(rock.position.x + rockVisualRadius()).toBeLessThanOrEqual(
+      simulation.map.world.width - simulation.map.world.padding,
+    );
+  });
 });
+
+function rockVisualRadius(): number {
+  return (
+    (Math.hypot(UNIT_FRAME_CONTRACT.width, UNIT_FRAME_CONTRACT.height) / 2) *
+    UNIT_FRAME_CONTRACT.displayScale
+  );
+}

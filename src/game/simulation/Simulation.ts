@@ -1,5 +1,6 @@
 import { FACTIONS, type Faction } from '../config/factions';
 import { GAME_CONFIG, type ShrineConfig } from '../config/gameConfig';
+import { UNIT_FRAME_CONTRACT } from '../config/unitSpriteManifest';
 import { getMapDefinition, type MapDefinition, type MapId } from '../maps/maps';
 import {
   add,
@@ -351,6 +352,7 @@ export class Simulation {
         unit.intent = decision.intent;
         unit.targetId = decision.targetId;
         desired = decision.direction;
+        if (decision.intent === 'chase') maximumSpeed *= unit.motion.chaseSpeedMultiplier;
         if (decision.intent === 'flee') maximumSpeed *= unit.motion.fleeSpeedMultiplier;
       }
       desired = add(desired, this.separationFor(unit));
@@ -489,16 +491,19 @@ export class Simulation {
         effectiveSwarmSpeed * GAME_CONFIG.swarm.maxInputSpeed * (stepMs / 1000),
       ),
     );
-    const min = this.map.world.padding + GAME_CONFIG.units.radius;
+    const min =
+      this.map.world.padding +
+      Math.max(GAME_CONFIG.units.radius, UNIT_FRAME_CONTRACT.boundaryRadius);
     this.playerTarget.x = Math.min(this.map.world.width - min, Math.max(min, this.playerTarget.x));
     this.playerTarget.y = Math.min(this.map.world.height - min, Math.max(min, this.playerTarget.y));
   }
 
   private constrainUnit(unit: Unit): boolean {
     let collided = false;
-    const min = this.map.world.padding + unit.radius;
-    const maxX = this.map.world.width - this.map.world.padding - unit.radius;
-    const maxY = this.map.world.height - this.map.world.padding - unit.radius;
+    const boundaryRadius = Math.max(unit.radius, UNIT_FRAME_CONTRACT.boundaryRadius);
+    const min = this.map.world.padding + boundaryRadius;
+    const maxX = this.map.world.width - this.map.world.padding - boundaryRadius;
+    const maxY = this.map.world.height - this.map.world.padding - boundaryRadius;
     const clampedX = Math.min(maxX, Math.max(min, unit.position.x));
     const clampedY = Math.min(maxY, Math.max(min, unit.position.y));
     if (clampedX !== unit.position.x) {

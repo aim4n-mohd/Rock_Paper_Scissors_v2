@@ -49,6 +49,17 @@ describe('game configuration', () => {
       },
     });
     expect(GAME_CONFIG.combat.baseKnockbackForce).toBeGreaterThan(125);
+    expect(GAME_CONFIG.units).toMatchObject({
+      detectionRadius: 215,
+      motion: {
+        chaseSpeedMultiplier: 1.08,
+        decisionIntervalMs: 225,
+        reactionDelayMs: 110,
+      },
+    });
+    expect(GAME_CONFIG.camera).toMatchObject({
+      screenMargin: 24,
+    });
     expect(GAME_CONFIG.minimap).toMatchObject({
       dashBarHeight: 4,
       dashBarGap: 6,

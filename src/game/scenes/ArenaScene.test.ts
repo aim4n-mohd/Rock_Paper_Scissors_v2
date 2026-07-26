@@ -131,6 +131,10 @@ describe('ArenaScene lifecycle', () => {
     expect(gameBridge.latest?.elapsedMs).toBe(100);
     expect(Number.isFinite(camera.scrollX)).toBe(true);
     expect(Number.isFinite(camera.scrollY)).toBe(true);
+    const visualRadius = (Math.hypot(16, 16) / 2) * 1.5;
+    expect(gameBridge.latest!.swarmCenter.x + visualRadius).toBeLessThanOrEqual(
+      camera.scrollX + GAME_CONFIG.viewport.width / camera.zoom - 24,
+    );
 
     expect(shutdown).toBeTypeOf('function');
     shutdown?.();

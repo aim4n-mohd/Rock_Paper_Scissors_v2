@@ -12,6 +12,7 @@ export interface UnitMotionConfig {
   reactionDelayMs: number;
   predictionTimeMs: number;
   predictionError: number;
+  chaseSpeedMultiplier: number;
   fleeSpeedMultiplier: number;
   obstacleAvoidanceStrength: number;
   obstacleLookAhead: number;
@@ -176,6 +177,7 @@ export interface GameConfig {
     smoothing: number;
     minimumSmoothing: number;
     velocityLagStrength: number;
+    screenMargin: number;
     zoomOutStartCount: number;
     zoomOutFullCount: number;
     minimumZoom: number;
@@ -200,7 +202,7 @@ export const GAME_CONFIG: GameConfig = {
   units: {
     maxHealth: 100,
     radius: 10,
-    detectionRadius: 190,
+    detectionRadius: 215,
     allyRadius: 105,
     motion: {
       maxSpeed: 112,
@@ -209,10 +211,11 @@ export const GAME_CONFIG: GameConfig = {
       drag: 0.55,
       maxSteeringForce: 520,
       maxTurnRate: 3.4,
-      decisionIntervalMs: 260,
-      reactionDelayMs: 140,
+      decisionIntervalMs: 225,
+      reactionDelayMs: 110,
       predictionTimeMs: 240,
       predictionError: 38,
+      chaseSpeedMultiplier: 1.08,
       fleeSpeedMultiplier: 1.12,
       obstacleAvoidanceStrength: 4.6,
       obstacleLookAhead: 62,
@@ -310,6 +313,7 @@ export const GAME_CONFIG: GameConfig = {
     smoothing: 0.09,
     minimumSmoothing: 0.045,
     velocityLagStrength: 0.36,
+    screenMargin: 24,
     zoomOutStartCount: 8,
     zoomOutFullCount: 28,
     minimumZoom: 0.82,
@@ -407,6 +411,7 @@ export function validateConfig(config: GameConfig): void {
     ['units.motion.maxSteeringForce', config.units.motion.maxSteeringForce],
     ['units.motion.maxTurnRate', config.units.motion.maxTurnRate],
     ['units.motion.decisionIntervalMs', config.units.motion.decisionIntervalMs],
+    ['units.motion.chaseSpeedMultiplier', config.units.motion.chaseSpeedMultiplier],
     ['units.motion.fleeSpeedMultiplier', config.units.motion.fleeSpeedMultiplier],
     ['units.motion.obstacleAvoidanceStrength', config.units.motion.obstacleAvoidanceStrength],
     ['units.motion.obstacleLookAhead', config.units.motion.obstacleLookAhead],
@@ -442,6 +447,7 @@ export function validateConfig(config: GameConfig): void {
     ['particles.lifetimeMs', config.particles.lifetimeMs],
     ['particles.speed', config.particles.speed],
     ['camera.minimumSmoothing', config.camera.minimumSmoothing],
+    ['camera.screenMargin', config.camera.screenMargin],
     ['camera.zoomOutStartCount', config.camera.zoomOutStartCount],
     ['camera.zoomOutFullCount', config.camera.zoomOutFullCount],
     ['camera.minimumZoom', config.camera.minimumZoom],
@@ -591,6 +597,11 @@ export function validateConfig(config: GameConfig): void {
     throw new Error('units.motion.reactionDelayMs must not exceed decisionIntervalMs.');
   if (config.world.width < config.viewport.width || config.world.height < config.viewport.height)
     throw new Error('world dimensions must be at least as large as the viewport.');
+  if (
+    config.camera.screenMargin * 2 >= config.viewport.width ||
+    config.camera.screenMargin * 2 >= config.viewport.height
+  )
+    throw new Error('camera.screenMargin must leave a visible camera area.');
   if (
     config.world.padding + config.units.radius >= config.world.width / 2 ||
     config.world.padding + config.units.radius >= config.world.height / 2

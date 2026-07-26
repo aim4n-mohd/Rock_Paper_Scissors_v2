@@ -124,15 +124,22 @@ export class ArenaScene extends Phaser.Scene {
       0,
       Math.max(0, this.map.world.height - visibleHeight),
     );
-    this.cameras.main.scrollX = Phaser.Math.Linear(
-      this.cameras.main.scrollX,
-      desiredX,
-      cameraFeel.smoothing,
+    const smoothedX = Phaser.Math.Linear(this.cameras.main.scrollX, desiredX, cameraFeel.smoothing);
+    const smoothedY = Phaser.Math.Linear(this.cameras.main.scrollY, desiredY, cameraFeel.smoothing);
+    const recruited = this.simulation.units.filter((unit) => unit.alive && unit.recruited);
+    this.cameras.main.scrollX = this.containCameraAxis(
+      smoothedX,
+      recruited.map((unit) => unit.position.x),
+      visibleWidth,
+      this.map.cameraBounds.x,
+      this.map.cameraBounds.width,
     );
-    this.cameras.main.scrollY = Phaser.Math.Linear(
-      this.cameras.main.scrollY,
-      desiredY,
-      cameraFeel.smoothing,
+    this.cameras.main.scrollY = this.containCameraAxis(
+      smoothedY,
+      recruited.map((unit) => unit.position.y),
+      visibleHeight,
+      this.map.cameraBounds.y,
+      this.map.cameraBounds.height,
     );
     this.minimap?.update(
       this.simulation.units,
@@ -156,6 +163,29 @@ export class ArenaScene extends Phaser.Scene {
 
   private publish(): void {
     gameBridge.publish(this.simulation.snapshot());
+  }
+
+  private containCameraAxis(
+    smoothedScroll: number,
+    unitPositions: readonly number[],
+    visibleSize: number,
+    worldStart: number,
+    worldSize: number,
+  ): number {
+    const maximumWorldScroll = Math.max(worldStart, worldStart + worldSize - visibleSize);
+    const worldClamped = Phaser.Math.Clamp(smoothedScroll, worldStart, maximumWorldScroll);
+    if (unitPositions.length === 0) return worldClamped;
+    const minimumUnit = Math.min(...unitPositions);
+    const maximumUnit = Math.max(...unitPositions);
+    const inset = UNIT_FRAME_CONTRACT.boundaryRadius + GAME_CONFIG.camera.screenMargin;
+    const minimumForTrailingEdge = maximumUnit + inset - visibleSize;
+    const maximumForLeadingEdge = minimumUnit - inset;
+    if (minimumForTrailingEdge > maximumForLeadingEdge) return worldClamped;
+    return Phaser.Math.Clamp(
+      Phaser.Math.Clamp(worldClamped, minimumForTrailingEdge, maximumForLeadingEdge),
+      worldStart,
+      maximumWorldScroll,
+    );
   }
 
   private drawWorld(): void {

@@ -42,6 +42,7 @@ export const UNIT_FRAME_CONTRACT = {
   originX: 8,
   originY: 8,
   displayScale: 1.5,
+  boundaryRadius: 18,
   filtering: 'nearest',
 } as const;
 

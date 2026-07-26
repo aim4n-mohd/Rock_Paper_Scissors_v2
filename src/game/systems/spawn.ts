@@ -1,5 +1,6 @@
 import { FACTIONS, type Faction } from '../config/factions';
 import { GAME_CONFIG } from '../config/gameConfig';
+import { UNIT_FRAME_CONTRACT } from '../config/unitSpriteManifest';
 import { getMapDefinition, isPositionInsideObstacle, type MapDefinition } from '../maps/maps';
 import { distance, type Vector } from '../math/vector';
 import { createSeededRandom } from '../math/random';
@@ -16,11 +17,12 @@ function insideRegion(position: Vector, region: MapDefinition['spawnRegions'][Fa
 
 function validPosition(position: Vector, units: readonly Unit[], map: MapDefinition): boolean {
   const { padding } = map.world;
+  const boundaryRadius = Math.max(GAME_CONFIG.units.radius, UNIT_FRAME_CONTRACT.boundaryRadius);
   if (
-    position.x < padding ||
-    position.y < padding ||
-    position.x > map.world.width - padding ||
-    position.y > map.world.height - padding
+    position.x < padding + boundaryRadius ||
+    position.y < padding + boundaryRadius ||
+    position.x > map.world.width - padding - boundaryRadius ||
+    position.y > map.world.height - padding - boundaryRadius
   )
     return false;
   if (isPositionInsideObstacle(map, position, GAME_CONFIG.units.radius + 4)) return false;
@@ -41,23 +43,23 @@ export function createInitialUnits(
     y: anchorRegion.y + anchorRegion.height / 2,
   };
   units.push(createUnit('rock-0', 'rock', anchorPosition, true));
+  const independentRegions = FACTIONS.flatMap((faction) => map.spawnRegions[faction]).filter(
+    (region) => region !== anchorRegion,
+  );
 
   for (const faction of FACTIONS) {
     const start = faction === 'rock' ? 1 : 0;
     for (let index = start; index < map.populationRecommendation[faction]; index += 1) {
       let position: Vector | undefined;
-      const factionRegions = map.spawnRegions[faction];
-      const regions =
-        faction === 'rock' && factionRegions.length > 1 ? factionRegions.slice(1) : factionRegions;
       for (
         let attempt = 0;
         (!position ||
-          !regions.some((region) => insideRegion(position!, region)) ||
+          !independentRegions.some((region) => insideRegion(position!, region)) ||
           !validPosition(position, units, map)) &&
         attempt < 1000;
         attempt += 1
       ) {
-        const region = regions[Math.floor(random() * regions.length)]!;
+        const region = independentRegions[Math.floor(random() * independentRegions.length)]!;
         position = {
           x: region.x + random() * region.width,
           y: region.y + random() * region.height,
