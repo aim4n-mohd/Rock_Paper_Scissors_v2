@@ -1,5 +1,6 @@
 import { render, waitFor } from '@testing-library/react';
 import { GameCanvas } from './GameCanvas';
+import { gameBridge } from './events/gameBridge';
 
 describe('GameCanvas lifecycle', () => {
   it('aborts an unfinished game startup when the effect is disposed', async () => {
@@ -47,5 +48,22 @@ describe('GameCanvas lifecycle', () => {
     await waitFor(() => expect(gameFactory).toHaveBeenCalledTimes(2));
     expect(firstDestroy).toHaveBeenCalledWith(true);
     expect(gameFactory.mock.calls[1]?.[2]).toBe('forest');
+  });
+
+  it('applies changed visual settings without destroying the active match', async () => {
+    const destroy = vi.fn();
+    const gameFactory = vi.fn(async () => ({ destroy }));
+    const applyVisualSettings = vi.spyOn(gameBridge, 'applyVisualSettings');
+    const { rerender } = render(
+      <GameCanvas gameFactory={gameFactory} visualSettings={{ minimapOpacity: 1 }} />,
+    );
+    await waitFor(() => expect(gameFactory).toHaveBeenCalledOnce());
+
+    rerender(<GameCanvas gameFactory={gameFactory} visualSettings={{ minimapOpacity: 0.4 }} />);
+
+    expect(gameFactory).toHaveBeenCalledOnce();
+    expect(destroy).not.toHaveBeenCalled();
+    expect(applyVisualSettings).toHaveBeenLastCalledWith({ minimapOpacity: 0.4 });
+    applyVisualSettings.mockRestore();
   });
 });

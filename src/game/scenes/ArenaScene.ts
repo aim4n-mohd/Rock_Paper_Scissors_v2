@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { FACTIONS, type Faction } from '../config/factions';
 import { FACTION_COLORS } from '../config/factionVisuals';
-import { GAME_CONFIG } from '../config/gameConfig';
+import { GAME_CONFIG, type MatchOptions } from '../config/gameConfig';
 import { UNIT_FRAME_CONTRACT, UNIT_SPRITE_MANIFEST } from '../config/unitSpriteManifest';
 import { gameBridge } from '../events/gameBridge';
 import {
@@ -31,18 +31,23 @@ export class ArenaScene extends Phaser.Scene {
   private minimap?: MinimapSystem;
   private lastPublish = 0;
   private readonly animationController = new UnitAnimationController();
-  private readonly visualSettings: VisualSettings;
+  private visualSettings: VisualSettings;
 
   constructor(
     mapId: MapId = 'meadow',
     seed = Date.now() & 0xffff,
     visualSettings: Partial<VisualSettings> = {},
+    matchOptions: Partial<MatchOptions> = {},
   ) {
     super('arena');
     this.map = getMapDefinition(mapId);
     this.decorationSeed = seed;
     this.visualSettings = resolveVisualSettings(visualSettings);
-    this.simulation = new Simulation(seed, { mapId, visualSettings: this.visualSettings });
+    this.simulation = new Simulation(seed, {
+      mapId,
+      visualSettings: this.visualSettings,
+      ...matchOptions,
+    });
   }
 
   create(): void {
@@ -60,7 +65,12 @@ export class ArenaScene extends Phaser.Scene {
       map: this.map,
     });
     this.minimap.initialize({ width: this.scale.width, height: this.scale.height });
+    this.minimap.setOpacity(this.visualSettings.minimapOpacity);
     const releaseController = gameBridge.bindController({
+      setPaused: (paused) => {
+        if ((this.simulation.status === 'paused') !== paused) this.simulation.togglePaused();
+        this.publish();
+      },
       togglePause: () => {
         this.simulation.togglePaused();
         this.publish();
@@ -85,6 +95,11 @@ export class ArenaScene extends Phaser.Scene {
       requestDash: () => {
         this.simulation.requestDash(gameBridge.input);
         this.publish();
+      },
+      applyVisualSettings: (settings) => {
+        this.visualSettings = resolveVisualSettings(settings);
+        this.simulation.applyVisualSettings(this.visualSettings);
+        this.minimap?.setOpacity(this.visualSettings.minimapOpacity);
       },
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

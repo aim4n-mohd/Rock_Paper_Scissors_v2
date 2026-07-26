@@ -3,6 +3,7 @@ import { GAME_CONFIG } from '../config/gameConfig';
 export interface VisualSettings {
   screenShake: boolean;
   particleIntensity: number;
+  minimapOpacity: number;
   reducedMotion: boolean;
   reducedFlashes: boolean;
 }
@@ -23,6 +24,7 @@ export interface CameraFeel {
 export const DEFAULT_VISUAL_SETTINGS: VisualSettings = {
   screenShake: true,
   particleIntensity: 1,
+  minimapOpacity: 1,
   reducedMotion: false,
   reducedFlashes: false,
 };
@@ -31,10 +33,14 @@ export function resolveVisualSettings(settings: Partial<VisualSettings> = {}): V
   const particleIntensity = Number.isFinite(settings.particleIntensity)
     ? Math.max(0, Math.min(4, settings.particleIntensity!))
     : DEFAULT_VISUAL_SETTINGS.particleIntensity;
+  const minimapOpacity = Number.isFinite(settings.minimapOpacity)
+    ? Math.max(0, Math.min(1, settings.minimapOpacity!))
+    : DEFAULT_VISUAL_SETTINGS.minimapOpacity;
   return {
     ...DEFAULT_VISUAL_SETTINGS,
     ...settings,
     particleIntensity,
+    minimapOpacity,
   };
 }
 

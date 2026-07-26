@@ -14,12 +14,13 @@ export function decideIndependentMovement(
   unit: Unit,
   units: readonly Unit[],
   wanderDirection: Vector,
+  detectionRadius = GAME_CONFIG.units.detectionRadius,
 ): MovementDecision {
   const predator = closestUnit(
     unit,
     units,
     (candidate) => candidate.faction === getPredator(unit.faction),
-    GAME_CONFIG.units.detectionRadius,
+    detectionRadius,
   );
   if (predator)
     return {
@@ -31,7 +32,7 @@ export function decideIndependentMovement(
     unit,
     units,
     (candidate) => candidate.faction === getPrey(unit.faction),
-    GAME_CONFIG.units.detectionRadius,
+    detectionRadius,
   );
   if (prey)
     return {

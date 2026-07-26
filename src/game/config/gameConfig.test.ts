@@ -77,6 +77,46 @@ describe('game configuration', () => {
       postTransformMovementMultiplier: 0.65,
       usesPerMatch: 1,
     });
+    expect(GAME_CONFIG.difficulties).toMatchObject({
+      casual: {
+        enemyDetectionRadiusMultiplier: 0.85,
+        enemyReactionDelayMultiplier: 1.3,
+        enemySpeedMultiplier: 0.95,
+        playerDashCooldownMultiplier: 0.85,
+        shrineSacrificeRatio: 0.15,
+        scoreMultiplier: 0.75,
+      },
+      normal: {
+        enemyPopulationMultiplier: 1,
+        scoreMultiplier: 1,
+      },
+      chaos: {
+        enemyPopulationMultiplier: 1.25,
+        enemyDetectionRadiusMultiplier: 1.15,
+        enemyReactionDelayMultiplier: 0.8,
+        enemySpeedMultiplier: 1.1,
+        shrineSacrificeRatio: 0.25,
+        scoreMultiplier: 1.5,
+      },
+    });
+    expect(GAME_CONFIG.gameModes).toMatchObject({
+      'last-faction-standing': {
+        scoreMultiplier: 1,
+        movementSpeedMultiplier: 1,
+      },
+      blitz: {
+        timeLimitMs: 180_000,
+        scoreMultiplier: 1.25,
+        completionBonus: 500,
+      },
+    });
+    expect(GAME_CONFIG.scoring).toEqual({
+      preyDefeatedPoints: 100,
+      predatorDefeatedPoints: 300,
+      victoryBonusPoints: 1000,
+      survivingRecruitedUnitPoints: 50,
+      pointsPerSecondUnderPar: 10,
+    });
   });
 
   it('contains balanced positive combat values and integer populations', () => {

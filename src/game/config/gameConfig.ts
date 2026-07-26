@@ -1,6 +1,45 @@
 import { FACTIONS, type Faction } from './factions';
 import { getMapDefinition } from '../maps/maps';
 
+export const DIFFICULTY_IDS = ['casual', 'normal', 'chaos'] as const;
+export type DifficultyId = (typeof DIFFICULTY_IDS)[number];
+export const GAME_MODE_IDS = ['last-faction-standing', 'blitz'] as const;
+export type GameModeId = (typeof GAME_MODE_IDS)[number];
+
+export interface MatchOptions {
+  startingFaction: Faction;
+  difficulty: DifficultyId;
+  mode: GameModeId;
+}
+
+export interface DifficultyConfig {
+  displayName: string;
+  enemyPopulationMultiplier: number;
+  enemyDetectionRadiusMultiplier: number;
+  enemyReactionDelayMultiplier: number;
+  enemySpeedMultiplier: number;
+  playerDashCooldownMultiplier: number;
+  shrineSacrificeRatio: number;
+  scoreMultiplier: number;
+}
+
+export interface GameModeConfig {
+  displayName: string;
+  description: string;
+  timeLimitMs?: number;
+  movementSpeedMultiplier: number;
+  scoreMultiplier: number;
+  completionBonus: number;
+}
+
+export interface ScoringConfig {
+  preyDefeatedPoints: number;
+  predatorDefeatedPoints: number;
+  victoryBonusPoints: number;
+  survivingRecruitedUnitPoints: number;
+  pointsPerSecondUnderPar: number;
+}
+
 export interface UnitMotionConfig {
   maxSpeed: number;
   acceleration: number;
@@ -190,6 +229,13 @@ export interface GameConfig {
   landmarks: { shrine: { x: number; y: number } };
   shrine: ShrineConfig;
   minimap: MinimapConfig;
+  difficulties: Record<DifficultyId, DifficultyConfig>;
+  gameModes: Record<GameModeId, GameModeConfig>;
+  scoring: ScoringConfig;
+  records: {
+    storageKey: string;
+    schemaVersion: number;
+  };
 }
 
 const DEFAULT_MAP = getMapDefinition('meadow');
@@ -395,6 +441,66 @@ export const GAME_CONFIG: GameConfig = {
     showTrees: true,
     showShrine: true,
   },
+  difficulties: {
+    casual: {
+      displayName: 'Casual',
+      enemyPopulationMultiplier: 1,
+      enemyDetectionRadiusMultiplier: 0.85,
+      enemyReactionDelayMultiplier: 1.3,
+      enemySpeedMultiplier: 0.95,
+      playerDashCooldownMultiplier: 0.85,
+      shrineSacrificeRatio: 0.15,
+      scoreMultiplier: 0.75,
+    },
+    normal: {
+      displayName: 'Normal',
+      enemyPopulationMultiplier: 1,
+      enemyDetectionRadiusMultiplier: 1,
+      enemyReactionDelayMultiplier: 1,
+      enemySpeedMultiplier: 1,
+      playerDashCooldownMultiplier: 1,
+      shrineSacrificeRatio: 0.2,
+      scoreMultiplier: 1,
+    },
+    chaos: {
+      displayName: 'Chaos',
+      enemyPopulationMultiplier: 1.25,
+      enemyDetectionRadiusMultiplier: 1.15,
+      enemyReactionDelayMultiplier: 0.8,
+      enemySpeedMultiplier: 1.1,
+      playerDashCooldownMultiplier: 1,
+      shrineSacrificeRatio: 0.25,
+      scoreMultiplier: 1.5,
+    },
+  },
+  gameModes: {
+    'last-faction-standing': {
+      displayName: 'Last Faction Standing',
+      description: 'Eliminate both rival factions with no time limit.',
+      movementSpeedMultiplier: 1,
+      scoreMultiplier: 1,
+      completionBonus: 0,
+    },
+    blitz: {
+      displayName: 'Blitz',
+      description: 'Eliminate both rival factions before the three-minute limit.',
+      timeLimitMs: 180_000,
+      movementSpeedMultiplier: 1.08,
+      scoreMultiplier: 1.25,
+      completionBonus: 500,
+    },
+  },
+  scoring: {
+    preyDefeatedPoints: 100,
+    predatorDefeatedPoints: 300,
+    victoryBonusPoints: 1000,
+    survivingRecruitedUnitPoints: 50,
+    pointsPerSecondUnderPar: 10,
+  },
+  records: {
+    storageKey: 'rps2:local-records',
+    schemaVersion: 1,
+  },
 };
 
 export function validateConfig(config: GameConfig): void {
@@ -491,6 +597,12 @@ export function validateConfig(config: GameConfig): void {
     ['shrine.ringThickness', config.shrine.ringThickness],
     ['shrine.symbolOrbitRadius', config.shrine.symbolOrbitRadius],
     ['shrine.symbolSize', config.shrine.symbolSize],
+    ['scoring.preyDefeatedPoints', config.scoring.preyDefeatedPoints],
+    ['scoring.predatorDefeatedPoints', config.scoring.predatorDefeatedPoints],
+    ['scoring.victoryBonusPoints', config.scoring.victoryBonusPoints],
+    ['scoring.survivingRecruitedUnitPoints', config.scoring.survivingRecruitedUnitPoints],
+    ['scoring.pointsPerSecondUnderPar', config.scoring.pointsPerSecondUnderPar],
+    ['records.schemaVersion', config.records.schemaVersion],
   ];
   for (const [name, value] of positives) {
     if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be positive.`);
@@ -555,6 +667,34 @@ export function validateConfig(config: GameConfig): void {
         throw new Error(`factionPassives.${faction}.${name} must be positive.`);
     }
   }
+  for (const difficultyId of DIFFICULTY_IDS) {
+    const difficulty = config.difficulties[difficultyId];
+    for (const [name, value] of Object.entries(difficulty)) {
+      if (typeof value === 'number' && (!Number.isFinite(value) || value <= 0))
+        throw new Error(`difficulties.${difficultyId}.${name} must be positive.`);
+    }
+    if (difficulty.shrineSacrificeRatio >= 1)
+      throw new Error(`difficulties.${difficultyId}.shrineSacrificeRatio must be below one.`);
+  }
+  for (const modeId of GAME_MODE_IDS) {
+    const mode = config.gameModes[modeId];
+    if (
+      mode.timeLimitMs !== undefined &&
+      (!Number.isFinite(mode.timeLimitMs) || mode.timeLimitMs <= 0)
+    )
+      throw new Error(`gameModes.${modeId}.timeLimitMs must be positive.`);
+    for (const [name, value] of [
+      ['movementSpeedMultiplier', mode.movementSpeedMultiplier],
+      ['scoreMultiplier', mode.scoreMultiplier],
+    ] as const)
+      if (!Number.isFinite(value) || value <= 0)
+        throw new Error(`gameModes.${modeId}.${name} must be positive.`);
+    if (!Number.isFinite(mode.completionBonus) || mode.completionBonus < 0)
+      throw new Error(`gameModes.${modeId}.completionBonus must be non-negative.`);
+  }
+  if (!config.records.storageKey.trim()) throw new Error('records.storageKey must not be empty.');
+  if (!Number.isInteger(config.records.schemaVersion))
+    throw new Error('records.schemaVersion must be an integer.');
   if (config.minimap.padding * 2 >= config.minimap.width)
     throw new Error('minimap.padding must leave positive drawing width.');
   if (config.minimap.padding * 2 >= config.minimap.maxHeight)

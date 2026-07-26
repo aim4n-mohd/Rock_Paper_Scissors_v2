@@ -34,22 +34,32 @@ function validPosition(position: Vector, units: readonly Unit[], map: MapDefinit
 export function createInitialUnits(
   seed = 1,
   map: MapDefinition = getMapDefinition('meadow'),
+  options: {
+    startingFaction?: Faction;
+    enemyPopulationMultiplier?: number;
+  } = {},
 ): Unit[] {
   const random = createSeededRandom(seed);
   const units: Unit[] = [];
-  const anchorRegion = map.spawnRegions.rock[0]!;
+  const startingFaction = options.startingFaction ?? 'rock';
+  const enemyPopulationMultiplier = options.enemyPopulationMultiplier ?? 1;
+  const anchorRegion = map.spawnRegions[startingFaction][0]!;
   const anchorPosition = {
     x: anchorRegion.x + anchorRegion.width / 2,
     y: anchorRegion.y + anchorRegion.height / 2,
   };
-  units.push(createUnit('rock-0', 'rock', anchorPosition, true));
+  units.push(createUnit(`${startingFaction}-0`, startingFaction, anchorPosition, true));
   const independentRegions = FACTIONS.flatMap((faction) => map.spawnRegions[faction]).filter(
     (region) => region !== anchorRegion,
   );
 
   for (const faction of FACTIONS) {
-    const start = faction === 'rock' ? 1 : 0;
-    for (let index = start; index < map.populationRecommendation[faction]; index += 1) {
+    const start = faction === startingFaction ? 1 : 0;
+    const population = Math.round(
+      map.populationRecommendation[faction] *
+        (faction === startingFaction ? 1 : enemyPopulationMultiplier),
+    );
+    for (let index = start; index < population; index += 1) {
       let position: Vector | undefined;
       for (
         let attempt = 0;

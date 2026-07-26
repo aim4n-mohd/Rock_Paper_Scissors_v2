@@ -43,6 +43,7 @@ function graphicsDouble() {
     'strokePath',
     'setDepth',
     'setScrollFactor',
+    'setAlpha',
     'destroy',
   ]) {
     graphics[method] = vi.fn(() => graphics);
@@ -52,7 +53,14 @@ function graphicsDouble() {
 
 function textDouble() {
   const text: Record<string, ReturnType<typeof vi.fn>> = {};
-  for (const method of ['destroy', 'setDepth', 'setOrigin', 'setPosition', 'setScrollFactor']) {
+  for (const method of [
+    'destroy',
+    'setAlpha',
+    'setDepth',
+    'setOrigin',
+    'setPosition',
+    'setScrollFactor',
+  ]) {
     text[method] = vi.fn(() => text);
   }
   return text;

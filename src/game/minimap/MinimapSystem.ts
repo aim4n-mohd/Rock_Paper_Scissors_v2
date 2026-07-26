@@ -65,6 +65,13 @@ export class MinimapSystem {
     this.resize(screen);
   }
 
+  setOpacity(opacity: number): void {
+    const alpha = clampAlpha(opacity);
+    this.staticGraphics?.setAlpha(alpha);
+    this.dynamicGraphics?.setAlpha(alpha);
+    this.dashLabel?.setAlpha(alpha);
+  }
+
   update(
     units: readonly Unit[],
     anchorId: string | undefined,

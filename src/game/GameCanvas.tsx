@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { gameBridge } from './events/gameBridge';
 import type { MapId } from './maps/maps';
+import type { DifficultyId, GameModeId } from './config/gameConfig';
+import type { Faction } from './config/factions';
+import type { VisualSettings } from './systems/gameFeel';
 
 declare global {
   interface Window {
@@ -20,37 +23,68 @@ export type GameFactory = (
   parent: HTMLElement,
   signal: AbortSignal,
   mapId: MapId,
+  matchOptions: {
+    startingFaction: Faction;
+    difficulty: DifficultyId;
+    mode: GameModeId;
+  },
+  visualSettings: Partial<VisualSettings>,
 ) => Promise<GameHandle | undefined>;
 
 async function defaultGameFactory(
   parent: HTMLElement,
   signal: AbortSignal,
   mapId: MapId,
+  matchOptions: {
+    startingFaction: Faction;
+    difficulty: DifficultyId;
+    mode: GameModeId;
+  },
+  visualSettings: Partial<VisualSettings>,
 ): Promise<GameHandle | undefined> {
   const { createGame } = await import('./createGame');
   if (signal.aborted) return undefined;
-  return createGame(parent, mapId);
+  return createGame(parent, mapId, visualSettings, matchOptions);
 }
 
 interface GameCanvasProps {
   onError?: (message: string) => void;
   gameFactory?: GameFactory;
   mapId?: MapId;
+  startingFaction?: Faction;
+  difficulty?: DifficultyId;
+  mode?: GameModeId;
+  visualSettings?: Partial<VisualSettings>;
 }
 
 export function GameCanvas({
   onError,
   gameFactory = defaultGameFactory,
   mapId = 'meadow',
+  startingFaction = 'rock',
+  difficulty = 'normal',
+  mode = 'last-faction-standing',
+  visualSettings = {},
 }: GameCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const initialVisualSettings = useRef(visualSettings);
 
   useEffect(() => {
     let disposed = false;
     let game: GameHandle | undefined;
     const startup = new AbortController();
     if (hostRef.current) {
-      void gameFactory(hostRef.current, startup.signal, mapId)
+      void gameFactory(
+        hostRef.current,
+        startup.signal,
+        mapId,
+        {
+          startingFaction,
+          difficulty,
+          mode,
+        },
+        initialVisualSettings.current,
+      )
         .then((createdGame) => {
           if (!createdGame) return;
           if (disposed) {
@@ -77,7 +111,11 @@ export function GameCanvas({
       game?.destroy(true);
       delete window.__RPS_TEST__;
     };
-  }, [gameFactory, mapId, onError]);
+  }, [difficulty, gameFactory, mapId, mode, onError, startingFaction]);
+
+  useEffect(() => {
+    gameBridge.applyVisualSettings(visualSettings);
+  }, [visualSettings]);
 
   return (
     <div

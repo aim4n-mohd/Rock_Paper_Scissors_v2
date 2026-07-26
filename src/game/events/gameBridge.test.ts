@@ -1,5 +1,12 @@
 import { gameBridge } from './gameBridge';
 
+const MATCH_SNAPSHOT = {
+  startingFaction: 'rock' as const,
+  difficulty: 'normal' as const,
+  mode: 'last-faction-standing' as const,
+  score: { current: 0, preyKills: 0, predatorKills: 0, killPoints: 0 },
+};
+
 describe('game bridge', () => {
   afterEach(() => gameBridge.reset());
 
@@ -7,6 +14,7 @@ describe('game bridge', () => {
     const listener = vi.fn();
     const unsubscribe = gameBridge.subscribe(listener);
     gameBridge.publish({
+      ...MATCH_SNAPSHOT,
       status: 'active',
       mapId: 'meadow',
       playerFaction: 'rock',
@@ -39,6 +47,7 @@ describe('game bridge', () => {
     expect(listener).toHaveBeenCalledOnce();
     unsubscribe();
     gameBridge.publish({
+      ...MATCH_SNAPSHOT,
       status: 'paused',
       mapId: 'meadow',
       playerFaction: 'rock',
@@ -156,5 +165,29 @@ describe('game bridge', () => {
 
     expect(selectShrineFaction).toHaveBeenCalledOnce();
     expect(selectShrineFaction).toHaveBeenCalledWith('scissors');
+  });
+
+  it('sets pause idempotently and applies live visual settings through the active controller', () => {
+    const setPaused = vi.fn();
+    const applyVisualSettings = vi.fn();
+    gameBridge.bindController({
+      setPaused,
+      applyVisualSettings,
+      togglePause: vi.fn(),
+      restart: vi.fn(),
+      killFaction: vi.fn(),
+      cycleShrineSelection: vi.fn(),
+      selectShrineFaction: vi.fn(),
+      requestDash: vi.fn(),
+    });
+
+    gameBridge.setPaused(true);
+    gameBridge.applyVisualSettings({ minimapOpacity: 0.4, reducedMotion: true });
+
+    expect(setPaused).toHaveBeenCalledWith(true);
+    expect(applyVisualSettings).toHaveBeenCalledWith({
+      minimapOpacity: 0.4,
+      reducedMotion: true,
+    });
   });
 });

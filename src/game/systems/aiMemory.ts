@@ -1,6 +1,7 @@
 import { add, normalize, scale, subtract, type Vector } from '../math/vector';
 import { seededValue } from '../math/random';
 import type { RememberedDecision, Unit } from '../model/unit';
+import { GAME_CONFIG } from '../config/gameConfig';
 import { decideIndependentMovement, type MovementDecision } from './ai';
 
 function seededDirection(seed: number, unitId: string, sequence: number): Vector {
@@ -31,9 +32,10 @@ function rememberDecision(
   units: readonly Unit[],
   seed: number,
   sequence: number,
+  detectionRadius: number,
 ): RememberedDecision {
   const wanderDirection = seededDirection(seed, unit.id, sequence);
-  const selected = decideIndependentMovement(unit, units, wanderDirection);
+  const selected = decideIndependentMovement(unit, units, wanderDirection, detectionRadius);
   const target = selected.targetId
     ? units.find((candidate) => candidate.alive && candidate.id === selected.targetId)
     : undefined;
@@ -69,10 +71,11 @@ export function updateAiSteering(
   units: readonly Unit[],
   nowMs: number,
   seed: number,
+  detectionRadius = GAME_CONFIG.units.detectionRadius,
 ): MovementDecision {
   activatePending(unit, nowMs);
   if (nowMs >= unit.aiMemory.nextDecisionAtMs) {
-    const decision = rememberDecision(unit, units, seed, unit.aiMemory.sequence);
+    const decision = rememberDecision(unit, units, seed, unit.aiMemory.sequence, detectionRadius);
     unit.aiMemory.sequence += 1;
     unit.aiMemory.pending = {
       decision,

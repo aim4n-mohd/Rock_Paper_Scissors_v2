@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_CONFIG } from './config/gameConfig';
+import { GAME_CONFIG, type MatchOptions } from './config/gameConfig';
 import { getMapDefinition, type MapId } from './maps/maps';
 import { ArenaScene } from './scenes/ArenaScene';
 import type { VisualSettings } from './systems/gameFeel';
@@ -8,6 +8,7 @@ export function createGameConfig(
   parent: HTMLElement,
   mapId: MapId = 'meadow',
   visualSettings: Partial<VisualSettings> = {},
+  matchOptions: Partial<MatchOptions> = {},
 ): Phaser.Types.Core.GameConfig {
   const map = getMapDefinition(mapId);
   return {
@@ -21,7 +22,7 @@ export function createGameConfig(
     roundPixels: true,
     render: { antialias: false, pixelArt: true, roundPixels: true },
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [new ArenaScene(mapId, undefined, visualSettings)],
+    scene: [new ArenaScene(mapId, undefined, visualSettings, matchOptions)],
   };
 }
 
@@ -29,6 +30,7 @@ export function createGame(
   parent: HTMLElement,
   mapId: MapId = 'meadow',
   visualSettings: Partial<VisualSettings> = {},
+  matchOptions: Partial<MatchOptions> = {},
 ): Phaser.Game {
-  return new Phaser.Game(createGameConfig(parent, mapId, visualSettings));
+  return new Phaser.Game(createGameConfig(parent, mapId, visualSettings, matchOptions));
 }

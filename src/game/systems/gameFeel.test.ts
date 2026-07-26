@@ -22,6 +22,7 @@ describe('configurable game-feel profiles', () => {
     expect(resolveVisualSettings({ particleIntensity: 0.25, reducedFlashes: true })).toEqual({
       screenShake: true,
       particleIntensity: 0.25,
+      minimapOpacity: 1,
       reducedMotion: false,
       reducedFlashes: true,
     });

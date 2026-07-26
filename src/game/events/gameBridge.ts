@@ -1,15 +1,18 @@
 import { normalize, vec, type Vector } from '../math/vector';
 import type { GameSnapshot } from '../simulation/Simulation';
 import type { Faction } from '../config/factions';
+import type { VisualSettings } from '../systems/gameFeel';
 
 type SnapshotListener = (snapshot: GameSnapshot) => void;
 interface GameController {
+  setPaused?(paused: boolean): void;
   togglePause(): void;
   restart(): void;
   killFaction(faction: Faction): void;
   cycleShrineSelection(direction: -1 | 1): void;
   selectShrineFaction(faction: Faction): void;
   requestDash(): void;
+  applyVisualSettings?(settings: Partial<VisualSettings>): void;
 }
 
 class GameBridge {
@@ -59,6 +62,10 @@ class GameBridge {
     this.clearInput();
     this.controllers[this.controllers.length - 1]?.togglePause();
   }
+  setPaused(paused: boolean): void {
+    this.clearInput();
+    this.controllers[this.controllers.length - 1]?.setPaused?.(paused);
+  }
   restart(): void {
     this.clearInput();
     this.controllers[this.controllers.length - 1]?.restart();
@@ -74,6 +81,9 @@ class GameBridge {
   }
   requestDash(): void {
     this.controllers[this.controllers.length - 1]?.requestDash();
+  }
+  applyVisualSettings(settings: Partial<VisualSettings>): void {
+    this.controllers[this.controllers.length - 1]?.applyVisualSettings?.(settings);
   }
 
   clearInput(): void {

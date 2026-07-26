@@ -231,22 +231,25 @@ All current gameplay tuning is centralized in the typed `GAME_CONFIG` object in
 | Minimap                | enabled, width 180, max height 130, margin 12, padding 5                                        |
 | Minimap alpha          | background 0.45, border 0.8, terrain 0.5, markers 0.9, viewport 0.9, neutral 0.55               |
 | Minimap dash indicator | bar height 4, gap 6, label gap 2, label font 9                                                  |
+| Difficulty scores      | Casual 0.75x, Normal 1x, Chaos 1.5x                                                             |
+| Difficulty shrine      | Casual 15%, Normal 20%, Chaos 25% sacrifice                                                     |
+| Game modes             | Last Faction Standing untimed; Blitz 180 s, movement 1.08x, score 1.25x, completion 500         |
+| Scoring                | prey 100, predator 300, victory 1000, survivor 50, full second under par 10                     |
+| Local records          | schema 1, keyed by map/starting faction/difficulty/mode                                         |
 
 ## Incomplete Final-Release Systems
 
-- Three-faction starting selection; the current player always starts as Rock.
-- Scoring and persisted high scores.
-- Easy, Normal, and Hard difficulty presets.
-- Last Faction Standing as an explicit selectable mode and a timed Blitz mode.
 - Player-facing match setup carrying faction, map, mode, and difficulty into the
-  simulation. Map selection currently exists only as a development selector.
+  simulation. A complete temporary development selector exists, but final setup UI does
+  not.
 - Music and sound effects.
 - Landing page with a non-interactive autoplaying background simulation.
 - First-time interactive tutorial.
 - Dedicated How to Play, Settings, match setup, and expanded Results screens.
 - Player-facing controls for the already-supported screen shake, particle intensity,
   reduced motion, and reduced flashes settings.
-- Local settings/tutorial/high-score persistence.
+- Local settings and tutorial-completion persistence. Versioned local match records are
+  complete.
 - Final responsive/accessibility/manual-browser QA across all new screens and maps.
 
 ## Requested Scope Conflicts
@@ -258,15 +261,16 @@ All current gameplay tuning is centralized in the typed `GAME_CONFIG` object in
    new release sequence.
 3. `IMPLEMENTATION_PROGRESS.md` says the one-map MVP is complete. It remains historical;
    `RELEASE_PROGRESS.md` is the new final-release status record.
-4. The Phase 3 arena refactor removed the former one-map scene/world coupling.
-   `Simulation` and spawning still assume Rock as the initial faction, one global
-   difficulty profile, and one elimination rule.
+4. Phase 5 removed the Rock-start, single-difficulty, and single-mode assumptions through
+   immutable match-rule resolution and explicit starting-faction spawning.
 5. Phase 4 added the typed pixel manifest/controller and effect-event hooks. The renderer
    still has no external sprite/audio preload lifecycle, music, or sound playback.
-6. `App.tsx` is a single match-oriented component, while the final release requires a
-   multi-screen product shell and a separate background simulation lifecycle.
-7. The `GameSnapshot` and E2E global types now contain `mapId`, but do not yet contain
-   score, mode, difficulty, time limit, or richer result data.
+6. Phase 6 replaced the single match-oriented shell with an explicit landing, setup,
+   tutorial, match, nested-panel, pause, and results flow. React owns navigation while
+   the active `Simulation` remains authoritative for match state.
+7. `GameSnapshot` contains map, starting/current faction, mode, difficulty, remaining
+   time, and current/final score data. Future product screens should consume this
+   additive contract rather than duplicating result logic.
 
 The new request does not require a backend. All requested persistence can remain local,
 and the final application can remain a static client build.
@@ -275,27 +279,27 @@ and the final application can remain a static client build.
 
 These refactors should be introduced only in the phase that first needs them:
 
-1. `MapDefinition` and the selected-map runtime seam are complete. Add immutable typed
-   `DifficultyPreset`, `GameModeDefinition`, and `MatchOptions` data only when their phase
-   begins. Derive per-match values from validated defaults instead of duplicating
-   constants.
+1. `MapDefinition`, typed difficulties/modes, match options, and immutable rule
+   resolution are complete. Continue deriving per-match values from validated defaults
+   instead of duplicating constants.
 2. Continue the incremental runtime-configuration injection used by the shrine override
    and selected map ID. Inject mode/difficulty values only when required, preserving
    current defaults.
 3. The necessary map refactor is complete: world, obstacle, terrain, spawn, shrine,
    preview, route, and minimap data are in validated definitions consumed by one
    `ArenaScene`. Do not split them back into copied map-specific scenes.
-4. Make initial player faction and match rule explicit. Remove the hard-coded Rock anchor
-   assumption from spawning and restart behavior.
+4. Initial player faction and match rules are explicit; keep starting faction immutable
+   for record identity while current player faction remains shrine-driven.
 5. Extend `GameSnapshot` additively and update `e2e/global.d.ts` in the same phase whenever
    the snapshot contract changes.
-6. Split React screens into small components and a typed client-side screen/match state
-   model when match setup is introduced. A router is not required for this static game.
+6. The Phase 6 React screen split and typed client-side state are complete. Keep the
+   router-free static flow and do not create a second gameplay state store.
 7. The small unit manifest and exact frame contract are complete. Add an audio service
    and external-asset preload adapter only when audio or replacement artwork is
    explicitly requested; do not introduce a general-purpose content framework.
-8. Add a versioned local-storage adapter with validation and safe fallback only when
-   settings/high scores are implemented.
+8. The versioned local-record and separate player-preference adapters are complete.
+   Preserve their independent schema/storage keys when audio settings are connected.
+   only in their requested phases rather than weakening its current schema validation.
 
 A rewrite, ECS migration, state-management library, database, backend, or procedural map
 system is not necessary.
@@ -420,66 +424,76 @@ Affected files/systems:
 
 ### Phase 5 - Match options, scoring, difficulty, and modes
 
-Scope:
+Status: complete on 2026-07-26; awaiting balance review.
 
-- Add typed player faction, difficulty, and mode definitions.
-- Make all three factions valid starting factions.
-- Implement score calculation.
-- Implement Last Faction Standing and timed Blitz rules.
-- Pass runtime match options into simulation/restart.
+Delivered scope:
 
-Expected files/systems:
+- Added typed starting faction, Casual/Normal/Chaos difficulties, and Last Faction
+  Standing/Blitz definitions with immutable per-match resolution.
+- Made all three factions valid deterministic starting factions.
+- Added authoritative deduplicated combat scoring, idempotent result bonuses, par-time
+  scoring, mode/difficulty multipliers, and HUD/results snapshots.
+- Added untimed Last Faction Standing and pausable three-minute Blitz timeout rules.
+- Added versioned safe local records keyed by map, starting faction, difficulty, and
+  mode.
+- Added a complete temporary development selector and passed options through React,
+  Phaser scene creation, simulation, and restart.
 
-- New match configuration/rule modules under `src/game/config` and
-  `src/game/systems`.
-- Spawn, simulation, snapshot, bridge, and their tests.
-- Test-only E2E type contract when the snapshot changes.
-- No final menu shell in this phase.
+Affected files/systems:
+
+- `gameConfig.ts`, new `matchRules.ts`, `scoring.ts`, and `localRecords.ts`.
+- Spawn, AI, simulation, snapshot, scene/canvas factory, React shell, CSS, focused tests,
+  E2E, and release documentation.
+- No final menu shell, audio, or tutorial work was added.
 
 ### Phase 6 - Product shell, landing simulation, match setup, and screens
 
-Scope:
+Status: complete on 2026-07-26; awaiting UI review.
 
-- Add a minimal landing page with a non-interactive autoplay background simulation.
-- Add match setup for faction, map, mode, and difficulty.
-- Add dedicated How to Play, Settings, Pause, and expanded Results screens.
-- Ensure only the intended Phaser instance owns input and audio.
+Delivered scope:
 
-Expected files/systems:
+- Added the minimal landing page and deterministic reduced autoplay simulation with
+  visibility pausing and lifecycle cleanup.
+- Added persistent card-based faction, difficulty, mode, and map selection.
+- Added the deterministic eight-stage first-run tutorial, skip/replay behavior, and
+  isolated tutorial completion state.
+- Added How to Play, immediately persisted Settings, nested Pause, and authoritative
+  Results screens.
+- Added explicit idempotent pause control and live visual-setting propagation so nested
+  screens never resume or recreate the match.
+- Added complete component and serial E2E flow coverage.
 
-- Split `src/App.tsx` into focused UI/screen modules.
-- CSS, bridge/canvas lifecycle, createGame/scene options, snapshots, UI tests, and E2E.
-- No tutorial or persistence yet.
+Affected files/systems:
 
-### Phase 7 - Audio and local persistence
+- `App.tsx`, `styles.css`, and focused components under `src/ui/`.
+- New deterministic tutorial controller and versioned player-preference adapter.
+- Game canvas/bridge, arena visual settings, minimap opacity, lifecycle tests, and E2E.
+- No graphics, gameplay balance, maps, scoring formulas, or audio playback were added.
+
+### Phase 7 - Audio and remaining local persistence
 
 Scope:
 
 - Add music and sound effects with browser gesture-safe startup.
 - Consume the typed recruitment, advantage/disadvantage hit, and shrine sound hooks
   established in Phase 4.
-- Persist validated settings, tutorial completion, and per-mode/difficulty/map high scores.
-- Add mute/volume controls and graceful storage/audio failure behavior.
+- Connect the already persisted master/music/SFX settings to playback.
+- Add graceful audio startup and playback failure behavior.
 
 Expected files/systems:
 
 - Audio assets, manifest, and audio service.
-- Versioned storage adapter and tests.
-- Settings/results/UI integration and E2E persistence coverage.
+- Extend the versioned storage architecture without changing the existing local-record
+  schema contract.
+- Settings/UI integration and E2E persistence coverage.
 
-### Phase 8 - First-time interactive tutorial
+### Phase 8 - Tutorial follow-up (scope already delivered)
 
-Scope:
+Status: core scope completed early in Phase 6 because the explicit Phase 6 request
+included the full first-time tutorial.
 
-- Add a deterministic, skippable first-time tutorial for movement, recruitment, dash,
-  faction relationships, and shrine interaction.
-- Keep tutorial state separate from normal scoring and high scores.
-
-Expected files/systems:
-
-- Tutorial state/system and UI components.
-- Simulation/bridge hooks required for tutorial steps.
-- Unit/UI/integration/E2E tests.
+No additional Phase 8 work should begin unless review identifies a tutorial-specific
+polish issue.
 
 ### Phase 9 - Final production readiness and static deployment
 

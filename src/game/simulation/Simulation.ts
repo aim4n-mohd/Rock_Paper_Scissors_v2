@@ -1,5 +1,10 @@
 import { FACTIONS, type Faction } from '../config/factions';
-import { GAME_CONFIG, type ShrineConfig } from '../config/gameConfig';
+import {
+  GAME_CONFIG,
+  type DifficultyId,
+  type GameModeId,
+  type ShrineConfig,
+} from '../config/gameConfig';
 import { UNIT_FRAME_CONTRACT } from '../config/unitSpriteManifest';
 import { getMapDefinition, type MapDefinition, type MapId } from '../maps/maps';
 import {
@@ -48,6 +53,8 @@ import {
   type VisualSettings,
 } from '../systems/gameFeel';
 import { ParticlePool } from '../systems/particlePool';
+import { resolveMatchRules, type ResolvedMatchRules } from '../systems/matchRules';
+import { ScoreTracker, type ScoreSnapshot } from '../systems/scoring';
 
 export type MatchStatus = 'active' | 'paused' | 'victory' | 'defeat';
 export interface ShrineSnapshot {
@@ -68,14 +75,19 @@ export interface ShrineSnapshot {
 export interface GameSnapshot {
   status: MatchStatus;
   mapId: MapId;
+  startingFaction: Faction;
   playerFaction: Faction;
+  difficulty: DifficultyId;
+  mode: GameModeId;
   counts: Record<Faction, number>;
   elapsedMs: number;
+  remainingMs?: number;
   recruitedCount: number;
   anchorId?: string;
   swarmCenter: Vector;
   shrine: ShrineSnapshot;
   dash: DashSnapshot;
+  score: ScoreSnapshot;
 }
 
 export type GameEffectEvent =
@@ -121,6 +133,9 @@ export interface SimulationOptions {
   shrine?: Partial<ShrineConfig>;
   mapId?: MapId;
   visualSettings?: Partial<VisualSettings>;
+  startingFaction?: Faction;
+  difficulty?: DifficultyId;
+  mode?: GameModeId;
 }
 
 function idAngle(id: string, timeMs: number): number {
@@ -148,15 +163,31 @@ export class Simulation {
   private playerTargetAnchorId?: string;
   private readonly dash = new DashSystem(GAME_CONFIG.dash);
   private readonly shrineConfig: ShrineConfig;
+  private readonly scoreTracker = new ScoreTracker(GAME_CONFIG.scoring);
   readonly visualSettings: VisualSettings;
   readonly map: MapDefinition;
+  readonly startingFaction: Faction;
+  readonly rules: ResolvedMatchRules;
 
   constructor(seed = 1, options: SimulationOptions = {}) {
     this.seed = seed;
     this.map = getMapDefinition(options.mapId ?? 'meadow');
-    this.shrineConfig = { ...GAME_CONFIG.shrine, ...options.shrine };
+    this.startingFaction = options.startingFaction ?? 'rock';
+    this.rules = resolveMatchRules({
+      difficulty: options.difficulty ?? 'normal',
+      mode: options.mode ?? 'last-faction-standing',
+    });
+    this.shrineConfig = {
+      ...GAME_CONFIG.shrine,
+      sacrificeRatio: this.rules.difficulty.shrineSacrificeRatio,
+      ...options.shrine,
+    };
     this.visualSettings = resolveVisualSettings(options.visualSettings);
     this.restart(seed);
+  }
+
+  applyVisualSettings(settings: Partial<VisualSettings>): void {
+    Object.assign(this.visualSettings, resolveVisualSettings(settings));
   }
 
   get particles(): Particle[] {
@@ -165,7 +196,22 @@ export class Simulation {
 
   restart(seed = this.seed): void {
     this.seed = seed;
-    this.units = createInitialUnits(seed, this.map);
+    this.units = createInitialUnits(seed, this.map, {
+      startingFaction: this.startingFaction,
+      enemyPopulationMultiplier: this.rules.difficulty.enemyPopulationMultiplier,
+    });
+    for (const unit of this.units) {
+      if (unit.recruited) continue;
+      unit.motion = {
+        ...unit.motion,
+        maxSpeed:
+          unit.motion.maxSpeed *
+          this.rules.difficulty.enemySpeedMultiplier *
+          this.rules.mode.movementSpeedMultiplier,
+        reactionDelayMs:
+          unit.motion.reactionDelayMs * this.rules.difficulty.enemyReactionDelayMultiplier,
+      };
+    }
     this.particlePool.clear();
     this.effectEvents = [];
     this.effectSequence = 0;
@@ -174,7 +220,7 @@ export class Simulation {
     this.accumulatorMs = 0;
     this.simulationMs = 0;
     this.status = 'active';
-    this.playerFaction = 'rock';
+    this.playerFaction = this.startingFaction;
     this.shrine = createShrineState(this.shrineConfig);
     this.dash.reset();
     this.refreshDashCooldownModifiers();
@@ -184,6 +230,7 @@ export class Simulation {
     for (const unit of this.units.filter((candidate) => candidate.recruited))
       this.assignSwarmOffset(unit);
     this.emittedDeaths.clear();
+    this.scoreTracker.reset();
   }
 
   setPaused(paused: boolean): void {
@@ -221,6 +268,7 @@ export class Simulation {
   currentEffectiveSwarmSpeed(): number {
     return (
       GAME_CONFIG.playerMovement.baseSpeed *
+      this.rules.mode.movementSpeedMultiplier *
       this.currentSwarmSpeedMultiplier() *
       this.playerMovementMultiplier() *
       this.dash.movementMultiplier()
@@ -348,7 +396,13 @@ export class Simulation {
           );
         idleFormationCorrection = !playerIsMoving;
       } else {
-        const decision = updateAiSteering(unit, this.units, this.simulationMs, this.seed);
+        const decision = updateAiSteering(
+          unit,
+          this.units,
+          this.simulationMs,
+          this.seed,
+          this.rules.enemyDetectionRadius,
+        );
         unit.intent = decision.intent;
         unit.targetId = decision.targetId;
         desired = decision.direction;
@@ -575,6 +629,21 @@ export class Simulation {
             )
               qualifyingPredatorHit = true;
           }
+          for (const deathId of result.deaths) {
+            const hit = result.hits.find((candidate) => candidate.targetId === deathId);
+            const target = this.units.find((unit) => unit.id === deathId);
+            const attacker = hit
+              ? this.units.find((unit) => unit.id === hit.attackerId)
+              : undefined;
+            if (target && attacker)
+              this.scoreTracker.recordCombatDeath({
+                deathId,
+                attackerFaction: attacker.faction,
+                attackerRecruited: attacker.recruited,
+                targetFaction: target.faction,
+                playerFaction: this.playerFaction,
+              });
+          }
         }
       }
     }
@@ -651,17 +720,32 @@ export class Simulation {
   }
 
   private evaluateResult(): void {
+    if (this.status === 'victory' || this.status === 'defeat') return;
     const counts = this.counts();
+    let result: 'victory' | 'defeat' | undefined;
     if (counts[this.playerFaction] === 0) {
-      this.status = 'defeat';
-      return;
-    }
-    if (
+      result = 'defeat';
+    } else if (
       FACTIONS.filter((faction) => faction !== this.playerFaction).every(
         (faction) => counts[faction] === 0,
       )
     )
-      this.status = 'victory';
+      result = 'victory';
+    else if (this.rules.timeLimitMs !== undefined && this.elapsedMs >= this.rules.timeLimitMs)
+      result = 'defeat';
+    if (!result) return;
+    this.status = result;
+    this.scoreTracker.finalize({
+      result,
+      survivingRecruitedUnits: this.units.filter(
+        (unit) => unit.alive && unit.recruited && unit.faction === this.playerFaction,
+      ).length,
+      elapsedMs: this.elapsedMs,
+      parCompletionMs: this.map.parCompletionMs,
+      difficultyMultiplier: this.rules.difficulty.scoreMultiplier,
+      modeMultiplier: this.rules.mode.scoreMultiplier,
+      modeCompletionBonus: this.rules.mode.completionBonus,
+    });
   }
 
   selectShrineFaction(faction: Faction): boolean {
@@ -717,9 +801,16 @@ export class Simulation {
     return {
       status: this.status,
       mapId: this.map.id,
+      startingFaction: this.startingFaction,
       playerFaction: this.playerFaction,
+      difficulty: this.rules.difficultyId,
+      mode: this.rules.modeId,
       counts: this.counts(),
       elapsedMs: this.elapsedMs,
+      remainingMs:
+        this.rules.timeLimitMs === undefined
+          ? undefined
+          : Math.max(0, this.rules.timeLimitMs - this.elapsedMs),
       recruitedCount,
       anchorId: this.anchorId,
       swarmCenter: this.swarmCenter(),
@@ -745,6 +836,10 @@ export class Simulation {
         minimumRecruitedUnits: this.shrineConfig.minimumRecruitedUnits,
       },
       dash: this.dash.snapshot(),
+      score: this.scoreTracker.snapshot(
+        this.rules.difficulty.scoreMultiplier,
+        this.rules.mode.scoreMultiplier,
+      ),
     };
   }
 
@@ -988,7 +1083,7 @@ export class Simulation {
   private refreshDashCooldownModifiers(): void {
     this.dash.setCooldownModifiers({
       factionMultiplier: GAME_CONFIG.factionPassives[this.playerFaction].dashCooldownMultiplier,
-      difficultyMultiplier: 1,
+      difficultyMultiplier: this.rules.difficulty.playerDashCooldownMultiplier,
       temporaryMultiplier: 1,
     });
   }
