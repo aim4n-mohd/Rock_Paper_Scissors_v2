@@ -5,11 +5,11 @@ describe('calculateSwarmSpeedMultiplier', () => {
     { count: 0, expected: 1 },
     { count: 1, expected: 1 },
     { count: -4, expected: 1 },
-    { count: 2, expected: 1.02 },
-    { count: 10, expected: 1.18 },
-    { count: 999, expected: 1.45 },
+    { count: 2, expected: 1.03 },
+    { count: 10, expected: 1.27 },
+    { count: 999, expected: 1.5 },
   ])('returns $expected for $count recruited units', ({ count, expected }) => {
-    expect(calculateSwarmSpeedMultiplier(count, 0.02, 0.45)).toBeCloseTo(expected);
+    expect(calculateSwarmSpeedMultiplier(count, 0.03, 0.5)).toBeCloseTo(expected);
   });
 
   it('is deterministic, config-driven, and caps the bonus', () => {

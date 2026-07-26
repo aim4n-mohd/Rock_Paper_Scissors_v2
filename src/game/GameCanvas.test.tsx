@@ -31,4 +31,21 @@ describe('GameCanvas lifecycle', () => {
     render(<GameCanvas gameFactory={gameFactory} onError={onError} />);
     await waitFor(() => expect(onError).toHaveBeenCalledWith('WebGL unavailable'));
   });
+
+  it('destroys the previous game before loading a different selected map', async () => {
+    const firstDestroy = vi.fn();
+    const secondDestroy = vi.fn();
+    const gameFactory = vi
+      .fn()
+      .mockResolvedValueOnce({ destroy: firstDestroy })
+      .mockResolvedValueOnce({ destroy: secondDestroy });
+    const { rerender } = render(<GameCanvas mapId="meadow" gameFactory={gameFactory} />);
+    await waitFor(() => expect(gameFactory).toHaveBeenCalledOnce());
+
+    rerender(<GameCanvas mapId="forest" gameFactory={gameFactory} />);
+
+    await waitFor(() => expect(gameFactory).toHaveBeenCalledTimes(2));
+    expect(firstDestroy).toHaveBeenCalledWith(true);
+    expect(gameFactory.mock.calls[1]?.[2]).toBe('forest');
+  });
 });

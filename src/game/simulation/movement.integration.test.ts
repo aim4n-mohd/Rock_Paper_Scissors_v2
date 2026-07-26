@@ -40,6 +40,25 @@ function idleSwarmFixture() {
   return { simulation, rocks };
 }
 
+function factionMovementFixture(faction: 'rock' | 'paper' | 'scissors') {
+  const simulation = new Simulation(211);
+  const first = createUnit('faction-player-a', faction, { x: 1200, y: 900 }, true);
+  const second = createUnit('faction-player-b', faction, { x: 1230, y: 925 }, true);
+  simulation.units = [
+    first,
+    second,
+    createUnit('far-rock', 'rock', { x: 2200, y: 1300 }),
+    createUnit('far-paper', 'paper', { x: 2400, y: 1300 }),
+    createUnit('far-scissors', 'scissors', { x: 2600, y: 1300 }),
+  ];
+  simulation.playerFaction = faction;
+  simulation.anchorId = first.id;
+  (simulation as unknown as { playerTarget: { x: number; y: number } }).playerTarget = {
+    ...first.position,
+  };
+  return { simulation, first, second };
+}
+
 describe('responsive imperfect movement integration', () => {
   it('keeps recruited units responsive while accelerating into player input', () => {
     const { simulation, first } = playerFixture();
@@ -49,7 +68,7 @@ describe('responsive imperfect movement integration', () => {
 
     expect(first.position.x).toBeGreaterThan(startX);
     expect(first.velocity.x).toBeGreaterThan(0);
-    expect(magnitude(first.velocity)).toBeLessThan(first.motion.maxSpeed);
+    expect(magnitude(first.velocity)).toBeLessThan(simulation.currentEffectiveSwarmSpeed());
   });
 
   it('moves recruited units as a loose swarm instead of synchronized copies', () => {
@@ -94,31 +113,53 @@ describe('responsive imperfect movement integration', () => {
     const enemy = createUnit('enemy', 'paper', { x: 1800, y: 900 });
     simulation.units.push(neutral, enemy);
 
-    expect(simulation.currentSwarmSpeedMultiplier()).toBeCloseTo(1.02);
+    expect(simulation.currentSwarmSpeedMultiplier()).toBeCloseTo(1.03);
     neutral.recruited = true;
-    expect(simulation.currentSwarmSpeedMultiplier()).toBeCloseTo(1.04);
+    expect(simulation.currentSwarmSpeedMultiplier()).toBeCloseTo(1.06);
     second.alive = false;
-    expect(simulation.currentSwarmSpeedMultiplier()).toBeCloseTo(1.02);
+    expect(simulation.currentSwarmSpeedMultiplier()).toBeCloseTo(1.03);
     neutral.alive = false;
     expect(simulation.currentSwarmSpeedMultiplier()).toBe(1);
+    enemy.recruited = true;
+    expect(simulation.currentSwarmSpeedMultiplier()).toBe(1);
     expect(first.alive).toBe(true);
-    expect(enemy.recruited).toBe(false);
   });
 
   it('recalculates speed in the same fixed step that a nearby unit is recruited', () => {
     const { simulation, first, second } = playerFixture();
     const recruit = createUnit('nearby-recruit', 'rock', {
-      x: first.position.x + GAME_CONFIG.recruitment.radius - 2,
+      x: first.position.x + simulation.currentRecruitmentRadius() - 2,
       y: first.position.y,
     });
     simulation.units.push(recruit);
-    expect(simulation.currentSwarmSpeedMultiplier()).toBeCloseTo(1.02);
+    expect(simulation.currentSwarmSpeedMultiplier()).toBeCloseTo(1.03);
 
     simulation.update(GAME_CONFIG.simulation.fixedStepMs, { x: 1, y: 0 });
 
     expect(recruit.recruited).toBe(true);
     expect(second.alive).toBe(true);
-    expect(simulation.currentSwarmSpeedMultiplier()).toBeCloseTo(1.04);
+    expect(simulation.currentSwarmSpeedMultiplier()).toBeCloseTo(1.06);
+  });
+
+  it('updates the capped recruitment radius immediately from living recruited units only', () => {
+    const { simulation, second } = playerFixture();
+    const neutral = createUnit('neutral-radius', 'rock', { x: 1800, y: 900 });
+    const enemy = createUnit('enemy-radius', 'paper', { x: 1850, y: 900 });
+    simulation.units.push(neutral, enemy);
+
+    expect(simulation.currentRecruitmentRadius()).toBe(58);
+    neutral.recruited = true;
+    expect(simulation.currentRecruitmentRadius()).toBe(61);
+    enemy.recruited = true;
+    expect(simulation.currentRecruitmentRadius()).toBe(61);
+    second.alive = false;
+    expect(simulation.currentRecruitmentRadius()).toBe(58);
+    neutral.alive = false;
+    expect(simulation.currentRecruitmentRadius()).toBe(55);
+
+    for (let index = 0; index < 100; index += 1)
+      simulation.units.push(createUnit(`radius-cap-${index}`, 'rock', { x: 2000, y: 1000 }, true));
+    expect(simulation.currentRecruitmentRadius()).toBe(130);
   });
 
   it('moves a larger recruited swarm faster while preserving acceleration and loose spacing', () => {
@@ -168,6 +209,53 @@ describe('responsive imperfect movement integration', () => {
     expect(magnitude(enemy.velocity)).toBeLessThanOrEqual(
       configuredMaximum * enemy.motion.fleeSpeedMultiplier,
     );
+  });
+
+  it('responds sharply to reversed input without an instantaneous velocity flip', () => {
+    const { simulation, first } = playerFixture();
+    simulation.update(180, { x: 1, y: 0 });
+    const beforeReverse = first.velocity.x;
+
+    simulation.update(50, { x: -1, y: 0 });
+
+    expect(first.velocity.x).toBeLessThan(beforeReverse);
+    expect(first.velocity.x).toBeGreaterThan(-simulation.currentEffectiveSwarmSpeed());
+  });
+
+  it('keeps remembered AI pursuit from mirroring a same-frame player reversal', () => {
+    const simulation = new Simulation(313);
+    const target = createUnit('direction-target', 'rock', { x: 1300, y: 900 }, true);
+    const hunter = createUnit('direction-hunter', 'paper', { x: 1150, y: 900 });
+    const scissors = createUnit('direction-scissors', 'scissors', { x: 2500, y: 1400 });
+    simulation.units = [target, hunter, scissors];
+    simulation.anchorId = target.id;
+
+    simulation.update(300, { x: 1, y: 0 });
+    const remembered = { ...hunter.aiMemory.active!.targetPosition! };
+    simulation.update(GAME_CONFIG.simulation.fixedStepMs, { x: -1, y: 0 });
+
+    expect(hunter.aiMemory.active?.targetPosition).toEqual(remembered);
+    expect(hunter.aiMemory.active?.targetPosition).not.toEqual(target.position);
+  });
+
+  it('applies Paper acceleration, Paper spread, and Scissors turn-rate passives to players only', () => {
+    const rock = factionMovementFixture('rock');
+    const paper = factionMovementFixture('paper');
+    rock.simulation.update(100, { x: 1, y: 0 });
+    paper.simulation.update(100, { x: 1, y: 0 });
+    expect(paper.first.velocity.x).toBeGreaterThan(rock.first.velocity.x);
+    expect(magnitude(paper.second.swarmOffset)).toBeGreaterThan(magnitude(rock.second.swarmOffset));
+
+    const turningRock = factionMovementFixture('rock');
+    const turningScissors = factionMovementFixture('scissors');
+    turningRock.first.velocity = { x: 100, y: 0 };
+    turningScissors.first.velocity = { x: 100, y: 0 };
+    turningRock.simulation.update(100, { x: 0, y: -1 });
+    turningScissors.simulation.update(100, { x: 0, y: -1 });
+    expect(Math.abs(turningScissors.first.velocity.y)).toBeGreaterThan(
+      Math.abs(turningRock.first.velocity.y),
+    );
+    expect(turningRock.first.motion).toEqual(turningScissors.first.motion);
   });
 
   it('settles instead of roaming when the player releases all movement input', () => {

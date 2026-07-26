@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { gameBridge } from './events/gameBridge';
+import type { MapId } from './maps/maps';
 
 declare global {
   interface Window {
@@ -18,23 +19,30 @@ interface GameHandle {
 export type GameFactory = (
   parent: HTMLElement,
   signal: AbortSignal,
+  mapId: MapId,
 ) => Promise<GameHandle | undefined>;
 
 async function defaultGameFactory(
   parent: HTMLElement,
   signal: AbortSignal,
+  mapId: MapId,
 ): Promise<GameHandle | undefined> {
   const { createGame } = await import('./createGame');
   if (signal.aborted) return undefined;
-  return createGame(parent);
+  return createGame(parent, mapId);
 }
 
 interface GameCanvasProps {
   onError?: (message: string) => void;
   gameFactory?: GameFactory;
+  mapId?: MapId;
 }
 
-export function GameCanvas({ onError, gameFactory = defaultGameFactory }: GameCanvasProps) {
+export function GameCanvas({
+  onError,
+  gameFactory = defaultGameFactory,
+  mapId = 'meadow',
+}: GameCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,7 +50,7 @@ export function GameCanvas({ onError, gameFactory = defaultGameFactory }: GameCa
     let game: GameHandle | undefined;
     const startup = new AbortController();
     if (hostRef.current) {
-      void gameFactory(hostRef.current, startup.signal)
+      void gameFactory(hostRef.current, startup.signal, mapId)
         .then((createdGame) => {
           if (!createdGame) return;
           if (disposed) {
@@ -69,14 +77,14 @@ export function GameCanvas({ onError, gameFactory = defaultGameFactory }: GameCa
       game?.destroy(true);
       delete window.__RPS_TEST__;
     };
-  }, [gameFactory, onError]);
+  }, [gameFactory, mapId, onError]);
 
   return (
     <div
       ref={hostRef}
       className="game-canvas"
       data-testid="game-canvas"
-      aria-label="Active meadow arena"
+      aria-label={`Active ${mapId} arena`}
     />
   );
 }

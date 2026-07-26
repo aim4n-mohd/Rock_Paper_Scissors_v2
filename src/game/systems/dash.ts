@@ -12,12 +12,30 @@ export interface DashSnapshot {
   cooldownMs: number;
 }
 
+export interface DashCooldownModifiers {
+  factionMultiplier: number;
+  difficultyMultiplier: number;
+  temporaryMultiplier: number;
+}
+
+const DEFAULT_COOLDOWN_MODIFIERS: DashCooldownModifiers = {
+  factionMultiplier: 1,
+  difficultyMultiplier: 1,
+  temporaryMultiplier: 1,
+};
+
+function smoothstep(progress: number): number {
+  const clamped = Math.max(0, Math.min(1, progress));
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
 export class DashSystem {
   private phase: DashPhase = 'ready';
   private direction = vec();
   private lastValidDirection = vec();
   private activeRemainingMs = 0;
   private cooldownRemainingMs = 0;
+  private cooldownModifiers = { ...DEFAULT_COOLDOWN_MODIFIERS };
 
   constructor(private readonly config: DashConfig) {}
 
@@ -57,13 +75,28 @@ export class DashSystem {
       if (this.activeRemainingMs <= 0) {
         this.activeRemainingMs = 0;
         this.phase = 'cooldown';
-        this.cooldownRemainingMs = this.config.cooldownMs;
+        this.cooldownRemainingMs = this.effectiveCooldownMs();
       }
     }
     if (this.phase === 'cooldown' && remaining > 0) {
       this.cooldownRemainingMs = Math.max(0, this.cooldownRemainingMs - remaining);
       if (this.cooldownRemainingMs === 0) this.phase = 'ready';
     }
+  }
+
+  setCooldownModifiers(modifiers: DashCooldownModifiers): void {
+    const previousDuration = this.effectiveCooldownMs();
+    const previousProgress =
+      this.phase === 'cooldown' && previousDuration > 0
+        ? this.cooldownRemainingMs / previousDuration
+        : 0;
+    this.cooldownModifiers = {
+      factionMultiplier: this.safeMultiplier(modifiers.factionMultiplier),
+      difficultyMultiplier: this.safeMultiplier(modifiers.difficultyMultiplier),
+      temporaryMultiplier: this.safeMultiplier(modifiers.temporaryMultiplier),
+    };
+    if (this.phase === 'cooldown')
+      this.cooldownRemainingMs = this.effectiveCooldownMs() * previousProgress;
   }
 
   handleCollision(): void {
@@ -76,6 +109,7 @@ export class DashSystem {
     this.lastValidDirection = vec();
     this.activeRemainingMs = 0;
     this.cooldownRemainingMs = 0;
+    this.cooldownModifiers = { ...DEFAULT_COOLDOWN_MODIFIERS };
   }
 
   isActive(): boolean {
@@ -87,7 +121,16 @@ export class DashSystem {
   }
 
   movementMultiplier(): number {
-    return this.isActive() ? this.config.speedMultiplier : 1;
+    if (!this.isActive()) return 1;
+    const elapsedMs = this.config.durationMs - this.activeRemainingMs;
+    const easeIn =
+      this.config.accelerationInMs > 0 ? smoothstep(elapsedMs / this.config.accelerationInMs) : 1;
+    const easeOut =
+      this.config.decelerationOutMs > 0
+        ? smoothstep(this.activeRemainingMs / this.config.decelerationOutMs)
+        : 1;
+    const intensity = Math.min(easeIn, easeOut);
+    return 1 + (this.config.speedMultiplier - 1) * intensity;
   }
 
   snapshot(): DashSnapshot {
@@ -97,13 +140,26 @@ export class DashSystem {
       direction: { ...this.direction },
       activeRemainingMs: this.activeRemainingMs,
       cooldownRemainingMs: this.cooldownRemainingMs,
-      cooldownMs: this.config.cooldownMs,
+      cooldownMs: this.effectiveCooldownMs(),
     };
   }
 
   private beginCooldown(): void {
     this.phase = 'cooldown';
     this.activeRemainingMs = 0;
-    this.cooldownRemainingMs = this.config.cooldownMs;
+    this.cooldownRemainingMs = this.effectiveCooldownMs();
+  }
+
+  private effectiveCooldownMs(): number {
+    return (
+      this.config.baseCooldownMs *
+      this.cooldownModifiers.factionMultiplier *
+      this.cooldownModifiers.difficultyMultiplier *
+      this.cooldownModifiers.temporaryMultiplier
+    );
+  }
+
+  private safeMultiplier(value: number): number {
+    return Number.isFinite(value) && value > 0 ? value : 1;
   }
 }

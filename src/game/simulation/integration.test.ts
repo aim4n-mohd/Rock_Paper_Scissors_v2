@@ -53,6 +53,48 @@ describe('simulation integration scenarios', () => {
     expect(paper.health).toBeLessThan(paper.maxHealth);
   });
 
+  it('keeps stronger knockback outside trees and world boundaries', () => {
+    const treeSimulation = new Simulation(61);
+    const tree = GAME_CONFIG.trees.positions[0]!;
+    const minimumTreeDistance = GAME_CONFIG.trees.radius + GAME_CONFIG.units.radius;
+    const treeRock = createUnit(
+      'tree-knockback-rock',
+      'rock',
+      { x: tree.x - minimumTreeDistance, y: tree.y },
+      true,
+    );
+    const treeScissors = createUnit('tree-knockback-scissors', 'scissors', {
+      x: treeRock.position.x - treeRock.radius - GAME_CONFIG.units.radius + 1,
+      y: tree.y,
+    });
+    treeSimulation.units = [
+      treeRock,
+      treeScissors,
+      createUnit('tree-knockback-paper', 'paper', { x: 2500, y: 1400 }),
+    ];
+    treeSimulation.anchorId = treeRock.id;
+    resolveCombatPair(treeRock, treeScissors, 1000);
+    treeSimulation.update(GAME_CONFIG.combat.knockbackDurationMs, { x: 0, y: 0 });
+    expect(distance(treeRock.position, tree)).toBeGreaterThanOrEqual(minimumTreeDistance);
+
+    const edgeSimulation = new Simulation(62);
+    const minimumX = GAME_CONFIG.world.padding + GAME_CONFIG.units.radius;
+    const edgeRock = createUnit('edge-knockback-rock', 'rock', { x: minimumX, y: 900 }, true);
+    const edgeScissors = createUnit('edge-knockback-scissors', 'scissors', {
+      x: minimumX + edgeRock.radius + GAME_CONFIG.units.radius - 1,
+      y: 900,
+    });
+    edgeSimulation.units = [
+      edgeRock,
+      edgeScissors,
+      createUnit('edge-knockback-paper', 'paper', { x: 2500, y: 1400 }),
+    ];
+    edgeSimulation.anchorId = edgeRock.id;
+    resolveCombatPair(edgeRock, edgeScissors, 1000);
+    edgeSimulation.update(GAME_CONFIG.combat.knockbackDurationMs, { x: 0, y: 0 });
+    expect(edgeRock.position.x).toBeGreaterThanOrEqual(minimumX);
+  });
+
   it('emits faction particles once and removes them after their lifetime', () => {
     const simulation = new Simulation(3);
     simulation.killFaction('paper');

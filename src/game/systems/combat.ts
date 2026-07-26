@@ -28,6 +28,14 @@ function canHit(attacker: Unit, target: Unit, nowMs: number): boolean {
   );
 }
 
+function knockbackForce(attacker: Unit, target: Unit): number {
+  return (
+    GAME_CONFIG.combat.baseKnockbackForce *
+    GAME_CONFIG.factionPassives[attacker.faction].outgoingKnockbackMultiplier *
+    GAME_CONFIG.factionPassives[target.faction].incomingKnockbackMultiplier
+  );
+}
+
 export function resolveCombatPair(a: Unit, b: Unit, nowMs: number): CombatResult {
   if (!a.alive || !b.alive || a.faction === b.faction) return { hitCount: 0, deaths: [], hits: [] };
   const aCanHit = canHit(a, b, nowMs);
@@ -41,8 +49,8 @@ export function resolveCombatPair(a: Unit, b: Unit, nowMs: number): CombatResult
 
   const direction = normalize(subtract(b.position, a.position));
   const fallbackDirection = direction.x === 0 && direction.y === 0 ? { x: 1, y: 0 } : direction;
-  a.knockback = scale(fallbackDirection, -GAME_CONFIG.combat.knockbackForce);
-  b.knockback = scale(fallbackDirection, GAME_CONFIG.combat.knockbackForce);
+  a.knockback = scale(fallbackDirection, -knockbackForce(b, a));
+  b.knockback = scale(fallbackDirection, knockbackForce(a, b));
   a.knockbackRemainingMs = GAME_CONFIG.combat.knockbackDurationMs;
   b.knockbackRemainingMs = GAME_CONFIG.combat.knockbackDurationMs;
 

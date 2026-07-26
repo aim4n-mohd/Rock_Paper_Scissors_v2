@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { FACTION_COLORS } from '../config/factionVisuals';
 import type { MinimapConfig } from '../config/gameConfig';
 import type { Unit } from '../model/unit';
+import type { MapDefinition } from '../maps/maps';
 import type { DashSnapshot } from '../systems/dash';
 import { calculateDashCooldownFill } from './dashCooldownModel';
 import {
@@ -16,8 +17,9 @@ import { buildMinimapMarkers, clampAlpha, type MinimapMarker } from './minimapMo
 
 export interface MinimapDependencies {
   config: MinimapConfig;
-  world: Rectangle;
-  trees: readonly { x: number; y: number }[];
+  map?: MapDefinition;
+  world?: Rectangle;
+  trees?: readonly { x: number; y: number }[];
   shrine?: { x: number; y: number };
 }
 
@@ -112,8 +114,10 @@ export class MinimapSystem {
   private resize(screen: ScreenSize): void {
     if (!this.staticGraphics) return;
     this.screen = { ...screen };
-    this.layout = calculateMinimapLayout(screen, this.dependencies.world, this.dependencies.config);
-    this.mapper = new MinimapCoordinateMapper(this.dependencies.world, this.layout.map);
+    const world = this.dependencies.map?.cameraBounds ?? this.dependencies.world;
+    if (!world) throw new Error('Minimap requires a map or world bounds.');
+    this.layout = calculateMinimapLayout(screen, world, this.dependencies.config);
+    this.mapper = new MinimapCoordinateMapper(world, this.layout.map);
     const barY =
       this.layout.frame.y -
       this.dependencies.config.dashBarGap -
@@ -124,7 +128,9 @@ export class MinimapSystem {
 
   private drawStatic(): void {
     if (!this.staticGraphics || !this.layout || !this.mapper) return;
-    const { config, trees, shrine } = this.dependencies;
+    const { config, map } = this.dependencies;
+    const trees = this.dependencies.trees ?? [];
+    const shrine = map?.shrine ?? this.dependencies.shrine;
     const backgroundAlpha = clampAlpha(config.backgroundAlpha);
     const terrainAlpha = clampAlpha(config.terrainAlpha);
     const graphics = this.staticGraphics.clear();
@@ -136,7 +142,7 @@ export class MinimapSystem {
         this.layout.frame.width,
         this.layout.frame.height,
       )
-      .fillStyle(COLORS.meadow, terrainAlpha)
+      .fillStyle(map?.minimap.groundColor ?? COLORS.meadow, terrainAlpha)
       .fillRect(
         this.layout.map.x,
         this.layout.map.y,
@@ -144,15 +150,33 @@ export class MinimapSystem {
         this.layout.map.height,
       );
 
+    if (map) {
+      for (const region of map.terrainRegions) {
+        const topLeft = this.mapper.worldToMinimap({ x: region.x, y: region.y });
+        const bottomRight = this.mapper.worldToMinimap({
+          x: region.x + region.width,
+          y: region.y + region.height,
+        });
+        graphics
+          .fillStyle(map.minimap.terrainColors[region.kind], terrainAlpha * region.alpha)
+          .fillRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+      }
+    }
+
     if (config.showTrees) {
-      for (const tree of trees) {
-        const point = this.mapper.worldToMinimap(tree);
-        graphics.fillStyle(COLORS.tree, terrainAlpha).fillCircle(point.x, point.y, 1.5);
+      const obstaclePoints = map?.obstacles.map((obstacle) => obstacle.position) ?? trees;
+      for (const obstacle of obstaclePoints) {
+        const point = this.mapper.worldToMinimap(obstacle);
+        graphics
+          .fillStyle(map?.minimap.obstacleColor ?? COLORS.tree, terrainAlpha)
+          .fillCircle(point.x, point.y, 1.8);
       }
     }
     if (config.showShrine && shrine) {
       const point = this.mapper.worldToMinimap(shrine);
-      graphics.fillStyle(COLORS.shrine, terrainAlpha).fillCircle(point.x, point.y, 2.5);
+      graphics
+        .fillStyle(map?.minimap.shrineColor ?? COLORS.shrine, terrainAlpha)
+        .fillCircle(point.x, point.y, 2.5);
     }
     graphics
       .lineStyle(config.borderThickness, COLORS.border, clampAlpha(config.borderAlpha))

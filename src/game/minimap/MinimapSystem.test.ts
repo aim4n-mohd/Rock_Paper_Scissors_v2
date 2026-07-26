@@ -1,5 +1,6 @@
 import { GAME_CONFIG } from '../config/gameConfig';
 import { createUnit } from '../model/unit';
+import { getMapDefinition } from '../maps/maps';
 import type { DashSnapshot } from '../systems/dash';
 import { calculateMinimapLayout } from './MinimapCoordinateMapper';
 import { MinimapSystem } from './MinimapSystem';
@@ -63,7 +64,7 @@ describe('MinimapSystem', () => {
     direction: { x: 0, y: 0 },
     activeRemainingMs: 0,
     cooldownRemainingMs: 0,
-    cooldownMs: GAME_CONFIG.dash.cooldownMs,
+    cooldownMs: GAME_CONFIG.dash.baseCooldownMs,
   };
 
   it('creates fixed-screen layers once, draws static terrain once, and reuses dynamic graphics', () => {
@@ -99,6 +100,34 @@ describe('MinimapSystem', () => {
     minimap.initialize({ width: 960, height: 540 });
 
     expect(staticGraphics.fillCircle).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses the selected map terrain, obstacles, shrine, and minimap palette', () => {
+    const { scene, staticGraphics } = sceneDouble();
+    const map = getMapDefinition('marsh');
+    const minimap = new MinimapSystem(scene as never, {
+      config: GAME_CONFIG.minimap,
+      map,
+    });
+
+    minimap.initialize({ width: 960, height: 540 });
+
+    expect(staticGraphics.fillStyle).toHaveBeenCalledWith(
+      map.minimap.groundColor,
+      GAME_CONFIG.minimap.terrainAlpha,
+    );
+    expect(staticGraphics.fillStyle).toHaveBeenCalledWith(
+      map.minimap.terrainColors.mud,
+      expect.any(Number),
+    );
+    expect(staticGraphics.fillStyle).toHaveBeenCalledWith(
+      map.minimap.obstacleColor,
+      GAME_CONFIG.minimap.terrainAlpha,
+    );
+    expect(staticGraphics.fillStyle).toHaveBeenCalledWith(
+      map.minimap.shrineColor,
+      GAME_CONFIG.minimap.terrainAlpha,
+    );
   });
 
   it('omits optional trees and shrine when their config toggles are disabled', () => {
@@ -312,7 +341,7 @@ describe('MinimapSystem', () => {
       ...readyDash,
       phase: 'cooldown' as const,
       ready: false,
-      cooldownRemainingMs: GAME_CONFIG.dash.cooldownMs / 2,
+      cooldownRemainingMs: GAME_CONFIG.dash.baseCooldownMs / 2,
     };
 
     minimap.initialize(screen);

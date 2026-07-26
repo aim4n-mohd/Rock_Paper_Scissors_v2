@@ -10,6 +10,7 @@ export interface ShrineState {
   usesRemaining: number;
   movementPenaltyRemainingMs: number;
   transformationEffectRemainingMs: number;
+  cancelledFeedbackRemainingMs: number;
 }
 
 export interface ShrineChannelContext {
@@ -22,12 +23,14 @@ export interface ShrineChannelContext {
 }
 
 export function createShrineState(config: ShrineConfig): ShrineState {
+  const usesRemaining = config.enabled ? config.usesPerMatch : 0;
   return {
-    status: 'available',
+    status: usesRemaining > 0 ? 'available' : 'used',
     channelProgressMs: 0,
-    usesRemaining: config.maxUses,
+    usesRemaining,
     movementPenaltyRemainingMs: 0,
     transformationEffectRemainingMs: 0,
+    cancelledFeedbackRemainingMs: 0,
   };
 }
 
@@ -41,6 +44,7 @@ export function selectShrineFaction(
   state.selectedFaction = selectedFaction;
   state.status = 'available';
   state.channelProgressMs = 0;
+  state.cancelledFeedbackRemainingMs = 0;
   return true;
 }
 
@@ -73,9 +77,11 @@ export function advanceShrineChannel(
   config: ShrineConfig,
 ): boolean {
   if (state.status === 'used') return false;
+  const wasChanneling = state.status === 'channeling' || state.channelProgressMs > 0;
   if (context.qualifyingPredatorHit || !canChannelShrine(state, context, config)) {
     state.status = 'available';
     state.channelProgressMs = 0;
+    if (wasChanneling) state.cancelledFeedbackRemainingMs = config.cancelledFeedbackMs;
     return false;
   }
   state.status = 'channeling';
@@ -92,6 +98,8 @@ export function tickShrineEffects(state: ShrineState, deltaMs: number): void {
     0,
     state.transformationEffectRemainingMs - deltaMs,
   );
+  state.cancelledFeedbackRemainingMs = Math.max(0, state.cancelledFeedbackRemainingMs - deltaMs);
   if (state.movementPenaltyRemainingMs < 0.000001) state.movementPenaltyRemainingMs = 0;
   if (state.transformationEffectRemainingMs < 0.000001) state.transformationEffectRemainingMs = 0;
+  if (state.cancelledFeedbackRemainingMs < 0.000001) state.cancelledFeedbackRemainingMs = 0;
 }

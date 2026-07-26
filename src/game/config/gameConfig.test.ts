@@ -2,11 +2,19 @@ import { GAME_CONFIG, validateConfig } from './gameConfig';
 import { distance } from '../math/vector';
 
 describe('game configuration', () => {
-  it('matches solo player speed to AI and uses the approved dash tuning', () => {
+  it('uses the approved final-release movement, recruitment, dash, and passive tuning', () => {
     expect(GAME_CONFIG.playerMovement).toMatchObject({
-      baseSwarmSpeed: GAME_CONFIG.units.motion.maxSpeed,
-      speedBonusPerUnit: 0.02,
-      maxSwarmSpeedBonus: 0.45,
+      baseSpeed: 120,
+      acceleration: 720,
+      deceleration: 820,
+      steeringResponsiveness: 1.2,
+      speedBonusPerRecruitedUnit: 0.03,
+      maximumSwarmSpeedBonus: 0.5,
+    });
+    expect(GAME_CONFIG.recruitment).toEqual({
+      baseRadius: 55,
+      radiusBonusPerUnit: 3,
+      maximumRadiusBonus: 75,
     });
     expect(GAME_CONFIG.swarm).toMatchObject({
       cohesion: 0.46,
@@ -18,15 +26,45 @@ describe('game configuration', () => {
       idleSpeedMultiplier: 0.45,
     });
     expect(GAME_CONFIG.dash).toMatchObject({
-      speedMultiplier: 3.4,
-      durationMs: 720,
-      cooldownMs: 2400,
+      speedMultiplier: 1.9,
+      durationMs: 220,
+      accelerationInMs: 45,
+      decelerationOutMs: 80,
+      baseCooldownMs: 1200,
     });
+    expect(GAME_CONFIG.factionPassives).toMatchObject({
+      rock: {
+        accelerationMultiplier: 0.9,
+        outgoingKnockbackMultiplier: 1.25,
+        incomingKnockbackMultiplier: 0.7,
+      },
+      paper: {
+        accelerationMultiplier: 1.2,
+        swarmSpreadMultiplier: 1.15,
+      },
+      scissors: {
+        turnRateMultiplier: 1.25,
+        dashCooldownMultiplier: 0.75,
+        swarmResponseMultiplier: 1.1,
+      },
+    });
+    expect(GAME_CONFIG.combat.baseKnockbackForce).toBeGreaterThan(125);
     expect(GAME_CONFIG.minimap).toMatchObject({
       dashBarHeight: 4,
       dashBarGap: 6,
       dashLabelGap: 2,
       dashLabelFontSize: 9,
+    });
+    expect(GAME_CONFIG.shrine).toMatchObject({
+      enabled: true,
+      activationRadius: 90,
+      minimumRecruitedUnits: 4,
+      channelDurationMs: 2000,
+      channelMovementMultiplier: 0.2,
+      sacrificeRatio: 0.2,
+      postTransformPenaltyMs: 3000,
+      postTransformMovementMultiplier: 0.65,
+      usesPerMatch: 1,
     });
   });
 
@@ -54,9 +92,9 @@ describe('game configuration', () => {
         combat: { ...GAME_CONFIG.combat, disadvantageDamage: -1 },
       }),
     ).toThrow(/disadvantageDamage/);
-    expect(() => validateConfig({ ...GAME_CONFIG, camera: { smoothing: 1.5 } })).toThrow(
-      /camera.smoothing/,
-    );
+    expect(() =>
+      validateConfig({ ...GAME_CONFIG, camera: { ...GAME_CONFIG.camera, smoothing: 1.5 } }),
+    ).toThrow(/camera.smoothing/);
     expect(() =>
       validateConfig({
         ...GAME_CONFIG,
@@ -132,9 +170,9 @@ describe('game configuration', () => {
     expect(() =>
       validateConfig({
         ...GAME_CONFIG,
-        shrine: { ...GAME_CONFIG.shrine, channelSpeedMultiplier: 1.1 },
+        shrine: { ...GAME_CONFIG.shrine, channelMovementMultiplier: 1.1 },
       }),
-    ).toThrow(/channelSpeedMultiplier/);
+    ).toThrow(/channelMovementMultiplier/);
     expect(() =>
       validateConfig({
         ...GAME_CONFIG,
@@ -144,9 +182,30 @@ describe('game configuration', () => {
     expect(() =>
       validateConfig({
         ...GAME_CONFIG,
-        playerMovement: { ...GAME_CONFIG.playerMovement, speedBonusPerUnit: -0.1 },
+        playerMovement: {
+          ...GAME_CONFIG.playerMovement,
+          speedBonusPerRecruitedUnit: -0.1,
+        },
       }),
-    ).toThrow(/speedBonusPerUnit/);
+    ).toThrow(/speedBonusPerRecruitedUnit/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        recruitment: { ...GAME_CONFIG.recruitment, radiusBonusPerUnit: -1 },
+      }),
+    ).toThrow(/radiusBonusPerUnit/);
+    expect(() =>
+      validateConfig({
+        ...GAME_CONFIG,
+        factionPassives: {
+          ...GAME_CONFIG.factionPassives,
+          rock: {
+            ...GAME_CONFIG.factionPassives.rock,
+            incomingKnockbackMultiplier: 0,
+          },
+        },
+      }),
+    ).toThrow(/incomingKnockbackMultiplier/);
     expect(() =>
       validateConfig({
         ...GAME_CONFIG,

@@ -1,3 +1,6 @@
+import { FACTIONS, type Faction } from './factions';
+import { getMapDefinition } from '../maps/maps';
+
 export interface UnitMotionConfig {
   maxSpeed: number;
   acceleration: number;
@@ -40,16 +43,32 @@ export interface MinimapConfig {
 }
 
 export interface PlayerMovementConfig {
-  baseSwarmSpeed: number;
-  speedBonusPerUnit: number;
-  maxSwarmSpeedBonus: number;
+  baseSpeed: number;
+  acceleration: number;
+  deceleration: number;
+  steeringResponsiveness: number;
+  speedBonusPerRecruitedUnit: number;
+  maximumSwarmSpeedBonus: number;
+}
+
+export interface FactionPassiveConfig {
+  accelerationMultiplier: number;
+  decelerationMultiplier: number;
+  turnRateMultiplier: number;
+  swarmSpreadMultiplier: number;
+  swarmResponseMultiplier: number;
+  dashCooldownMultiplier: number;
+  outgoingKnockbackMultiplier: number;
+  incomingKnockbackMultiplier: number;
 }
 
 export interface DashConfig {
   enabled: boolean;
   speedMultiplier: number;
   durationMs: number;
-  cooldownMs: number;
+  accelerationInMs: number;
+  decelerationOutMs: number;
+  baseCooldownMs: number;
   minimumInputMagnitude: number;
   allowWhilePaused: boolean;
   cancelOnCollision: boolean;
@@ -60,15 +79,18 @@ export interface DashConfig {
 }
 
 export interface ShrineConfig {
+  enabled: boolean;
   activationRadius: number;
   channelDurationMs: number;
   minimumRecruitedUnits: number;
   sacrificeRatio: number;
-  channelSpeedMultiplier: number;
+  channelMovementMultiplier: number;
   postTransformPenaltyMs: number;
-  postTransformSpeedMultiplier: number;
+  postTransformMovementMultiplier: number;
   highDamageInterruptThreshold: number;
-  maxUses: number;
+  interruptOnDisadvantageDamage: boolean;
+  usesPerMatch: number;
+  cancelledFeedbackMs: number;
   effectLifetimeMs: number;
   effectParticleCount: number;
   effectParticleSpeed: number;
@@ -77,6 +99,31 @@ export interface ShrineConfig {
   ringThickness: number;
   symbolOrbitRadius: number;
   symbolSize: number;
+}
+
+export interface VisualsConfig {
+  treeCollisionSkin: number;
+  animation: {
+    movementThreshold: number;
+    deathTransitionMs: number;
+    recruitmentEffectMs: number;
+    shrineTransformMs: number;
+  };
+  particles: {
+    maximumActive: number;
+    movementIntervalMs: number;
+    movementCount: number;
+    recruitmentCount: number;
+    disadvantageHitCount: number;
+    advantageHitCount: number;
+  };
+  combat: {
+    disadvantageFlashMs: number;
+    advantageFlashMs: number;
+    disadvantageHitPauseMs: number;
+    advantageHitPauseMs: number;
+    largeClashHitCount: number;
+  };
 }
 
 export interface GameConfig {
@@ -94,10 +141,14 @@ export interface GameConfig {
     advantageDamage: number;
     disadvantageDamage: number;
     hitCooldownMs: number;
-    knockbackForce: number;
+    baseKnockbackForce: number;
     knockbackDurationMs: number;
   };
-  recruitment: { radius: number };
+  recruitment: {
+    baseRadius: number;
+    radiusBonusPerUnit: number;
+    maximumRadiusBonus: number;
+  };
   swarm: {
     cohesion: number;
     separation: number;
@@ -110,44 +161,41 @@ export interface GameConfig {
     idleSpeedMultiplier: number;
   };
   playerMovement: PlayerMovementConfig;
+  terrain: {
+    mud: {
+      speedMultiplier: number;
+      accelerationMultiplier: number;
+      rockResistance: number;
+    };
+  };
+  factionPassives: Record<Faction, FactionPassiveConfig>;
   dash: DashConfig;
   simulation: { fixedStepMs: number; maxFrameMs: number };
   particles: { count: number; lifetimeMs: number; speed: number };
-  camera: { smoothing: number };
+  camera: {
+    smoothing: number;
+    minimumSmoothing: number;
+    velocityLagStrength: number;
+    zoomOutStartCount: number;
+    zoomOutFullCount: number;
+    minimumZoom: number;
+    zoomSmoothing: number;
+    shakeDurationMs: number;
+    shakeIntensity: number;
+  };
+  visuals: VisualsConfig;
   trees: { radius: number; positions: readonly { x: number; y: number }[] };
   landmarks: { shrine: { x: number; y: number } };
   shrine: ShrineConfig;
   minimap: MinimapConfig;
 }
 
-const TREE_POSITIONS = [
-  { x: 270, y: 240 },
-  { x: 590, y: 180 },
-  { x: 910, y: 300 },
-  { x: 1280, y: 190 },
-  { x: 1650, y: 320 },
-  { x: 2050, y: 190 },
-  { x: 2470, y: 310 },
-  { x: 2670, y: 660 },
-  { x: 2310, y: 780 },
-  { x: 1980, y: 610 },
-  { x: 1650, y: 810 },
-  { x: 1320, y: 610 },
-  { x: 980, y: 820 },
-  { x: 650, y: 650 },
-  { x: 250, y: 790 },
-  { x: 430, y: 1190 },
-  { x: 810, y: 1380 },
-  { x: 1180, y: 1170 },
-  { x: 1530, y: 1360 },
-  { x: 1880, y: 1130 },
-  { x: 2250, y: 1370 },
-  { x: 2630, y: 1190 },
-] as const;
+const DEFAULT_MAP = getMapDefinition('meadow');
+const DEFAULT_TREES = DEFAULT_MAP.obstacles.filter((obstacle) => obstacle.kind === 'tree');
 
 export const GAME_CONFIG: GameConfig = {
   viewport: { width: 960, height: 540 },
-  world: { width: 2880, height: 1620, padding: 36 },
+  world: { ...DEFAULT_MAP.world },
   population: { rock: 15, paper: 12, scissors: 16 },
   units: {
     maxHealth: 100,
@@ -175,10 +223,14 @@ export const GAME_CONFIG: GameConfig = {
     advantageDamage: 35,
     disadvantageDamage: 8,
     hitCooldownMs: 350,
-    knockbackForce: 125,
-    knockbackDurationMs: 140,
+    baseKnockbackForce: 180,
+    knockbackDurationMs: 180,
   },
-  recruitment: { radius: 62 },
+  recruitment: {
+    baseRadius: 55,
+    radiusBonusPerUnit: 3,
+    maximumRadiusBonus: 75,
+  },
   swarm: {
     cohesion: 0.46,
     separation: 1.1,
@@ -191,15 +243,59 @@ export const GAME_CONFIG: GameConfig = {
     idleSpeedMultiplier: 0.45,
   },
   playerMovement: {
-    baseSwarmSpeed: 112,
-    speedBonusPerUnit: 0.02,
-    maxSwarmSpeedBonus: 0.45,
+    baseSpeed: 120,
+    acceleration: 720,
+    deceleration: 820,
+    steeringResponsiveness: 1.2,
+    speedBonusPerRecruitedUnit: 0.03,
+    maximumSwarmSpeedBonus: 0.5,
+  },
+  terrain: {
+    mud: {
+      speedMultiplier: 0.62,
+      accelerationMultiplier: 0.55,
+      rockResistance: 0.18,
+    },
+  },
+  factionPassives: {
+    rock: {
+      accelerationMultiplier: 0.9,
+      decelerationMultiplier: 0.82,
+      turnRateMultiplier: 1,
+      swarmSpreadMultiplier: 1,
+      swarmResponseMultiplier: 1,
+      dashCooldownMultiplier: 1,
+      outgoingKnockbackMultiplier: 1.25,
+      incomingKnockbackMultiplier: 0.7,
+    },
+    paper: {
+      accelerationMultiplier: 1.2,
+      decelerationMultiplier: 1,
+      turnRateMultiplier: 1,
+      swarmSpreadMultiplier: 1.15,
+      swarmResponseMultiplier: 1,
+      dashCooldownMultiplier: 1,
+      outgoingKnockbackMultiplier: 1,
+      incomingKnockbackMultiplier: 1,
+    },
+    scissors: {
+      accelerationMultiplier: 1,
+      decelerationMultiplier: 1,
+      turnRateMultiplier: 1.25,
+      swarmSpreadMultiplier: 0.9,
+      swarmResponseMultiplier: 1.1,
+      dashCooldownMultiplier: 0.75,
+      outgoingKnockbackMultiplier: 1,
+      incomingKnockbackMultiplier: 1,
+    },
   },
   dash: {
     enabled: true,
-    speedMultiplier: 3.4,
-    durationMs: 720,
-    cooldownMs: 2400,
+    speedMultiplier: 1.9,
+    durationMs: 220,
+    accelerationInMs: 45,
+    decelerationOutMs: 80,
+    baseCooldownMs: 1200,
     minimumInputMagnitude: 0.1,
     allowWhilePaused: false,
     cancelOnCollision: false,
@@ -210,19 +306,59 @@ export const GAME_CONFIG: GameConfig = {
   },
   simulation: { fixedStepMs: 1000 / 60, maxFrameMs: 1000 },
   particles: { count: 8, lifetimeMs: 650, speed: 55 },
-  camera: { smoothing: 0.09 },
-  trees: { radius: 34, positions: TREE_POSITIONS },
-  landmarks: { shrine: { x: 1440, y: 810 } },
+  camera: {
+    smoothing: 0.09,
+    minimumSmoothing: 0.045,
+    velocityLagStrength: 0.36,
+    zoomOutStartCount: 8,
+    zoomOutFullCount: 28,
+    minimumZoom: 0.82,
+    zoomSmoothing: 0.035,
+    shakeDurationMs: 90,
+    shakeIntensity: 0.0025,
+  },
+  visuals: {
+    treeCollisionSkin: 3,
+    animation: {
+      movementThreshold: 8,
+      deathTransitionMs: 260,
+      recruitmentEffectMs: 420,
+      shrineTransformMs: 900,
+    },
+    particles: {
+      maximumActive: 240,
+      movementIntervalMs: 110,
+      movementCount: 1,
+      recruitmentCount: 6,
+      disadvantageHitCount: 3,
+      advantageHitCount: 8,
+    },
+    combat: {
+      disadvantageFlashMs: 80,
+      advantageFlashMs: 135,
+      disadvantageHitPauseMs: 0,
+      advantageHitPauseMs: 28,
+      largeClashHitCount: 4,
+    },
+  },
+  trees: {
+    radius: DEFAULT_TREES[0]?.collisionRadius ?? 42,
+    positions: DEFAULT_TREES.map((tree) => tree.position),
+  },
+  landmarks: { shrine: { ...DEFAULT_MAP.shrine } },
   shrine: {
-    activationRadius: 115,
+    enabled: true,
+    activationRadius: 90,
     channelDurationMs: 2000,
     minimumRecruitedUnits: 4,
     sacrificeRatio: 0.2,
-    channelSpeedMultiplier: 0.24,
+    channelMovementMultiplier: 0.2,
     postTransformPenaltyMs: 3000,
-    postTransformSpeedMultiplier: 0.55,
+    postTransformMovementMultiplier: 0.65,
     highDamageInterruptThreshold: 35,
-    maxUses: 1,
+    interruptOnDisadvantageDamage: false,
+    usesPerMatch: 1,
+    cancelledFeedbackMs: 900,
     effectLifetimeMs: 900,
     effectParticleCount: 8,
     effectParticleSpeed: 90,
@@ -278,9 +414,9 @@ export function validateConfig(config: GameConfig): void {
     ['combat.advantageDamage', config.combat.advantageDamage],
     ['combat.disadvantageDamage', config.combat.disadvantageDamage],
     ['combat.hitCooldownMs', config.combat.hitCooldownMs],
-    ['combat.knockbackForce', config.combat.knockbackForce],
+    ['combat.baseKnockbackForce', config.combat.baseKnockbackForce],
     ['combat.knockbackDurationMs', config.combat.knockbackDurationMs],
-    ['recruitment.radius', config.recruitment.radius],
+    ['recruitment.baseRadius', config.recruitment.baseRadius],
     ['swarm.cohesion', config.swarm.cohesion],
     ['swarm.separation', config.swarm.separation],
     ['swarm.separationRadius', config.swarm.separationRadius],
@@ -290,16 +426,35 @@ export function validateConfig(config: GameConfig): void {
     ['swarm.arrivalRadius', config.swarm.arrivalRadius],
     ['swarm.returnStrength', config.swarm.returnStrength],
     ['swarm.idleSpeedMultiplier', config.swarm.idleSpeedMultiplier],
-    ['playerMovement.baseSwarmSpeed', config.playerMovement.baseSwarmSpeed],
+    ['playerMovement.baseSpeed', config.playerMovement.baseSpeed],
+    ['playerMovement.acceleration', config.playerMovement.acceleration],
+    ['playerMovement.deceleration', config.playerMovement.deceleration],
+    ['playerMovement.steeringResponsiveness', config.playerMovement.steeringResponsiveness],
+    ['terrain.mud.speedMultiplier', config.terrain.mud.speedMultiplier],
+    ['terrain.mud.accelerationMultiplier', config.terrain.mud.accelerationMultiplier],
     ['dash.speedMultiplier', config.dash.speedMultiplier],
     ['dash.durationMs', config.dash.durationMs],
-    ['dash.cooldownMs', config.dash.cooldownMs],
+    ['dash.baseCooldownMs', config.dash.baseCooldownMs],
     ['dash.particleLifetimeMs', config.dash.particleLifetimeMs],
     ['dash.particleSpeed', config.dash.particleSpeed],
     ['simulation.fixedStepMs', config.simulation.fixedStepMs],
     ['simulation.maxFrameMs', config.simulation.maxFrameMs],
     ['particles.lifetimeMs', config.particles.lifetimeMs],
     ['particles.speed', config.particles.speed],
+    ['camera.minimumSmoothing', config.camera.minimumSmoothing],
+    ['camera.zoomOutStartCount', config.camera.zoomOutStartCount],
+    ['camera.zoomOutFullCount', config.camera.zoomOutFullCount],
+    ['camera.minimumZoom', config.camera.minimumZoom],
+    ['camera.zoomSmoothing', config.camera.zoomSmoothing],
+    ['camera.shakeDurationMs', config.camera.shakeDurationMs],
+    ['camera.shakeIntensity', config.camera.shakeIntensity],
+    ['visuals.animation.movementThreshold', config.visuals.animation.movementThreshold],
+    ['visuals.animation.deathTransitionMs', config.visuals.animation.deathTransitionMs],
+    ['visuals.animation.recruitmentEffectMs', config.visuals.animation.recruitmentEffectMs],
+    ['visuals.animation.shrineTransformMs', config.visuals.animation.shrineTransformMs],
+    ['visuals.particles.movementIntervalMs', config.visuals.particles.movementIntervalMs],
+    ['visuals.combat.advantageFlashMs', config.visuals.combat.advantageFlashMs],
+    ['visuals.combat.advantageHitPauseMs', config.visuals.combat.advantageHitPauseMs],
     ['trees.radius', config.trees.radius],
     ['world.width', config.world.width],
     ['world.height', config.world.height],
@@ -316,11 +471,12 @@ export function validateConfig(config: GameConfig): void {
     ['shrine.activationRadius', config.shrine.activationRadius],
     ['shrine.channelDurationMs', config.shrine.channelDurationMs],
     ['shrine.minimumRecruitedUnits', config.shrine.minimumRecruitedUnits],
-    ['shrine.channelSpeedMultiplier', config.shrine.channelSpeedMultiplier],
+    ['shrine.channelMovementMultiplier', config.shrine.channelMovementMultiplier],
     ['shrine.postTransformPenaltyMs', config.shrine.postTransformPenaltyMs],
-    ['shrine.postTransformSpeedMultiplier', config.shrine.postTransformSpeedMultiplier],
+    ['shrine.postTransformMovementMultiplier', config.shrine.postTransformMovementMultiplier],
     ['shrine.highDamageInterruptThreshold', config.shrine.highDamageInterruptThreshold],
-    ['shrine.maxUses', config.shrine.maxUses],
+    ['shrine.usesPerMatch', config.shrine.usesPerMatch],
+    ['shrine.cancelledFeedbackMs', config.shrine.cancelledFeedbackMs],
     ['shrine.effectLifetimeMs', config.shrine.effectLifetimeMs],
     ['shrine.effectParticleCount', config.shrine.effectParticleCount],
     ['shrine.effectParticleSpeed', config.shrine.effectParticleSpeed],
@@ -342,6 +498,12 @@ export function validateConfig(config: GameConfig): void {
     if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be non-negative.`);
   }
   if (
+    !Number.isFinite(config.terrain.mud.rockResistance) ||
+    config.terrain.mud.rockResistance < 0 ||
+    config.terrain.mud.rockResistance > 1
+  )
+    throw new Error('terrain.mud.rockResistance must be between 0 and 1.');
+  if (
     !Number.isFinite(config.dash.minimumInputMagnitude) ||
     config.dash.minimumInputMagnitude < 0 ||
     config.dash.minimumInputMagnitude > 1
@@ -349,6 +511,20 @@ export function validateConfig(config: GameConfig): void {
     throw new Error('dash.minimumInputMagnitude must be between 0 and 1.');
   if (!Number.isInteger(config.dash.particleCount) || config.dash.particleCount <= 0)
     throw new Error('dash.particleCount must be a positive integer.');
+  for (const [name, value] of [
+    ['dash.accelerationInMs', config.dash.accelerationInMs],
+    ['dash.decelerationOutMs', config.dash.decelerationOutMs],
+    ['recruitment.radiusBonusPerUnit', config.recruitment.radiusBonusPerUnit],
+    ['recruitment.maximumRadiusBonus', config.recruitment.maximumRadiusBonus],
+    ['camera.velocityLagStrength', config.camera.velocityLagStrength],
+    ['visuals.treeCollisionSkin', config.visuals.treeCollisionSkin],
+    ['visuals.combat.disadvantageFlashMs', config.visuals.combat.disadvantageFlashMs],
+    ['visuals.combat.disadvantageHitPauseMs', config.visuals.combat.disadvantageHitPauseMs],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be non-negative.`);
+  }
+  if (config.dash.accelerationInMs + config.dash.decelerationOutMs > config.dash.durationMs)
+    throw new Error('dash easing durations must not exceed durationMs.');
   for (const [name, value] of [
     ['minimap.backgroundAlpha', config.minimap.backgroundAlpha],
     ['minimap.borderAlpha', config.minimap.borderAlpha],
@@ -360,10 +536,18 @@ export function validateConfig(config: GameConfig): void {
     if (!Number.isFinite(value)) throw new Error(`${name} must be finite.`);
   }
   for (const [name, value] of [
-    ['playerMovement.speedBonusPerUnit', config.playerMovement.speedBonusPerUnit],
-    ['playerMovement.maxSwarmSpeedBonus', config.playerMovement.maxSwarmSpeedBonus],
+    ['playerMovement.speedBonusPerRecruitedUnit', config.playerMovement.speedBonusPerRecruitedUnit],
+    ['playerMovement.maximumSwarmSpeedBonus', config.playerMovement.maximumSwarmSpeedBonus],
   ] as const) {
     if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be non-negative.`);
+  }
+  for (const faction of FACTIONS) {
+    if (!config.factionPassives[faction])
+      throw new Error(`factionPassives.${faction} must be configured.`);
+    for (const [name, value] of Object.entries(config.factionPassives[faction])) {
+      if (!Number.isFinite(value) || value <= 0)
+        throw new Error(`factionPassives.${faction}.${name} must be positive.`);
+    }
   }
   if (config.minimap.padding * 2 >= config.minimap.width)
     throw new Error('minimap.padding must leave positive drawing width.');
@@ -376,14 +560,14 @@ export function validateConfig(config: GameConfig): void {
   )
     throw new Error('shrine.sacrificeRatio must be greater than 0 and less than 1.');
   for (const [name, value] of [
-    ['shrine.channelSpeedMultiplier', config.shrine.channelSpeedMultiplier],
-    ['shrine.postTransformSpeedMultiplier', config.shrine.postTransformSpeedMultiplier],
+    ['shrine.channelMovementMultiplier', config.shrine.channelMovementMultiplier],
+    ['shrine.postTransformMovementMultiplier', config.shrine.postTransformMovementMultiplier],
   ] as const) {
     if (value > 1) throw new Error(`${name} must be at most 1.`);
   }
   for (const [name, value] of [
     ['shrine.minimumRecruitedUnits', config.shrine.minimumRecruitedUnits],
-    ['shrine.maxUses', config.shrine.maxUses],
+    ['shrine.usesPerMatch', config.shrine.usesPerMatch],
     ['shrine.effectParticleCount', config.shrine.effectParticleCount],
   ] as const) {
     if (!Number.isInteger(value)) throw new Error(`${name} must be an integer.`);
@@ -425,12 +609,28 @@ export function validateConfig(config: GameConfig): void {
     throw new Error('population.rock must include at least one initial anchor.');
   if (!Number.isInteger(config.particles.count) || config.particles.count <= 0)
     throw new Error('particles.count must be a positive integer.');
+  for (const [name, value] of [
+    ['visuals.particles.maximumActive', config.visuals.particles.maximumActive],
+    ['visuals.particles.movementCount', config.visuals.particles.movementCount],
+    ['visuals.particles.recruitmentCount', config.visuals.particles.recruitmentCount],
+    ['visuals.particles.disadvantageHitCount', config.visuals.particles.disadvantageHitCount],
+    ['visuals.particles.advantageHitCount', config.visuals.particles.advantageHitCount],
+    ['visuals.combat.largeClashHitCount', config.visuals.combat.largeClashHitCount],
+  ] as const) {
+    if (!Number.isInteger(value) || value <= 0)
+      throw new Error(`${name} must be a positive integer.`);
+  }
   if (
     !Number.isFinite(config.camera.smoothing) ||
     config.camera.smoothing <= 0 ||
     config.camera.smoothing > 1
   )
     throw new Error('camera.smoothing must be greater than 0 and at most 1.');
+  if (config.camera.minimumSmoothing > config.camera.smoothing)
+    throw new Error('camera.minimumSmoothing must not exceed camera.smoothing.');
+  if (config.camera.zoomOutFullCount <= config.camera.zoomOutStartCount)
+    throw new Error('camera.zoomOutFullCount must exceed camera.zoomOutStartCount.');
+  if (config.camera.minimumZoom > 1) throw new Error('camera.minimumZoom must be at most 1.');
   for (const [index, tree] of config.trees.positions.entries()) {
     const minimum = config.world.padding + config.trees.radius;
     if (
