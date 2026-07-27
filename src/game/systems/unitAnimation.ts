@@ -61,15 +61,23 @@ export class UnitAnimationController {
     }
 
     const speed = magnitude(unit.velocity);
-    const playbackRate =
-      unit.faction === 'rock'
-        ? Math.max(0.55, Math.min(2.8, 0.55 + speed / 75))
-        : Math.max(0.75, Math.min(2.4, 0.8 + speed / 130));
+    const playback = GAME_CONFIG.visuals.animation.playbackByFaction[unit.faction];
+    const playbackRate = Math.max(
+      playback.minimumRate,
+      Math.min(playback.maximumRate, playback.baseRate + speed / playback.speedDivisor),
+    );
     runtime.elapsedMs += Math.max(0, deltaMs) * (context.reducedMotion ? 0 : playbackRate);
 
-    if (unit.faction === 'rock' && state !== 'idle' && !context.reducedMotion)
-      runtime.rotation += (speed * Math.max(0, deltaMs)) / 8000;
-    else if (
+    if (unit.faction === 'rock' && state !== 'idle' && !context.reducedMotion) {
+      runtime.rotation =
+        (runtime.rotation +
+          ((speed * Math.max(0, deltaMs)) /
+            1000 /
+            GAME_CONFIG.visuals.animation.rockRollPixelsPerRotation) *
+            Math.PI *
+            2) %
+        (Math.PI * 2);
+    } else if (
       unit.faction === 'scissors' &&
       speed >= GAME_CONFIG.visuals.animation.movementThreshold
     )
@@ -77,7 +85,14 @@ export class UnitAnimationController {
     else if (unit.faction === 'paper')
       runtime.rotation = context.reducedMotion
         ? 0
-        : Math.max(-0.18, Math.min(0.18, unit.velocity.x / 700));
+        : Math.max(
+            -GAME_CONFIG.visuals.animation.paperMaximumTiltRadians,
+            Math.min(
+              GAME_CONFIG.visuals.animation.paperMaximumTiltRadians,
+              (unit.velocity.x / GAME_CONFIG.visuals.animation.paperVelocityForMaximumTilt) *
+                GAME_CONFIG.visuals.animation.paperMaximumTiltRadians,
+            ),
+          );
 
     const definition = UNIT_SPRITE_MANIFEST.factions[unit.faction].animations[state];
     const rawIndex = Math.floor(runtime.elapsedMs / definition.frameDurationMs);

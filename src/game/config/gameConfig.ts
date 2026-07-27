@@ -148,6 +148,18 @@ export interface VisualsConfig {
     deathTransitionMs: number;
     recruitmentEffectMs: number;
     shrineTransformMs: number;
+    playbackByFaction: Record<
+      Faction,
+      {
+        minimumRate: number;
+        baseRate: number;
+        speedDivisor: number;
+        maximumRate: number;
+      }
+    >;
+    rockRollPixelsPerRotation: number;
+    paperMaximumTiltRadians: number;
+    paperVelocityForMaximumTilt: number;
   };
   particles: {
     maximumActive: number;
@@ -374,6 +386,29 @@ export const GAME_CONFIG: GameConfig = {
       deathTransitionMs: 260,
       recruitmentEffectMs: 420,
       shrineTransformMs: 900,
+      playbackByFaction: {
+        rock: {
+          minimumRate: 0.6,
+          baseRate: 0.62,
+          speedDivisor: 180,
+          maximumRate: 1.4,
+        },
+        paper: {
+          minimumRate: 0.72,
+          baseRate: 0.75,
+          speedDivisor: 240,
+          maximumRate: 1.35,
+        },
+        scissors: {
+          minimumRate: 0.75,
+          baseRate: 0.78,
+          speedDivisor: 220,
+          maximumRate: 1.4,
+        },
+      },
+      rockRollPixelsPerRotation: 160,
+      paperMaximumTiltRadians: 0.14,
+      paperVelocityForMaximumTilt: 200,
     },
     particles: {
       maximumActive: 240,
@@ -564,6 +599,15 @@ export function validateConfig(config: GameConfig): void {
     ['visuals.animation.deathTransitionMs', config.visuals.animation.deathTransitionMs],
     ['visuals.animation.recruitmentEffectMs', config.visuals.animation.recruitmentEffectMs],
     ['visuals.animation.shrineTransformMs', config.visuals.animation.shrineTransformMs],
+    [
+      'visuals.animation.rockRollPixelsPerRotation',
+      config.visuals.animation.rockRollPixelsPerRotation,
+    ],
+    ['visuals.animation.paperMaximumTiltRadians', config.visuals.animation.paperMaximumTiltRadians],
+    [
+      'visuals.animation.paperVelocityForMaximumTilt',
+      config.visuals.animation.paperVelocityForMaximumTilt,
+    ],
     ['visuals.particles.movementIntervalMs', config.visuals.particles.movementIntervalMs],
     ['visuals.combat.advantageFlashMs', config.visuals.combat.advantageFlashMs],
     ['visuals.combat.advantageHitPauseMs', config.visuals.combat.advantageHitPauseMs],
@@ -666,6 +710,15 @@ export function validateConfig(config: GameConfig): void {
       if (!Number.isFinite(value) || value <= 0)
         throw new Error(`factionPassives.${faction}.${name} must be positive.`);
     }
+    const playback = config.visuals.animation.playbackByFaction[faction];
+    for (const [name, value] of Object.entries(playback)) {
+      if (!Number.isFinite(value) || value <= 0)
+        throw new Error(`visuals.animation.playbackByFaction.${faction}.${name} must be positive.`);
+    }
+    if (playback.minimumRate > playback.baseRate || playback.baseRate > playback.maximumRate)
+      throw new Error(
+        `visuals.animation.playbackByFaction.${faction} rates must be ordered minimum, base, maximum.`,
+      );
   }
   for (const difficultyId of DIFFICULTY_IDS) {
     const difficulty = config.difficulties[difficultyId];

@@ -85,6 +85,7 @@ export class MinimapSystem {
     if (!this.screen || this.screen.width !== screen.width || this.screen.height !== screen.height)
       this.resize(screen);
     if (!this.mapper) return;
+    this.lockToScreen(camera.zoom, screen);
 
     const graphics = this.dynamicGraphics.clear();
     for (const marker of buildMinimapMarkers(
@@ -125,12 +126,31 @@ export class MinimapSystem {
     if (!world) throw new Error('Minimap requires a map or world bounds.');
     this.layout = calculateMinimapLayout(screen, world, this.dependencies.config);
     this.mapper = new MinimapCoordinateMapper(world, this.layout.map);
+    this.positionDashLabel(1, 0, 0);
+    this.drawStatic();
+  }
+
+  private lockToScreen(cameraZoom: number, screen: ScreenSize): void {
+    const zoom = Number.isFinite(cameraZoom) && cameraZoom > 0 ? cameraZoom : 1;
+    const inverseZoom = 1 / zoom;
+    const layerX = (screen.width / 2) * (1 - inverseZoom);
+    const layerY = (screen.height / 2) * (1 - inverseZoom);
+    this.staticGraphics?.setScale(inverseZoom).setPosition(layerX, layerY);
+    this.dynamicGraphics?.setScale(inverseZoom).setPosition(layerX, layerY);
+    this.dashLabel?.setScale(inverseZoom);
+    this.positionDashLabel(inverseZoom, layerX, layerY);
+  }
+
+  private positionDashLabel(scale: number, offsetX: number, offsetY: number): void {
+    if (!this.layout) return;
     const barY =
       this.layout.frame.y -
       this.dependencies.config.dashBarGap -
       this.dependencies.config.dashBarHeight;
-    this.dashLabel?.setPosition(this.layout.frame.x, barY - this.dependencies.config.dashLabelGap);
-    this.drawStatic();
+    this.dashLabel?.setPosition(
+      offsetX + this.layout.frame.x * scale,
+      offsetY + (barY - this.dependencies.config.dashLabelGap) * scale,
+    );
   }
 
   private drawStatic(): void {

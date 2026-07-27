@@ -21,6 +21,8 @@ function graphicsDouble() {
     'strokeCircle',
     'lineBetween',
     'setDepth',
+    'setPosition',
+    'setScale',
     'setScrollFactor',
   ]) {
     graphics[method] = vi.fn((...args: unknown[]) => {
@@ -33,7 +35,14 @@ function graphicsDouble() {
 
 function textDouble() {
   const text: Record<string, unknown> = {};
-  for (const method of ['destroy', 'setDepth', 'setOrigin', 'setPosition', 'setScrollFactor']) {
+  for (const method of [
+    'destroy',
+    'setDepth',
+    'setOrigin',
+    'setPosition',
+    'setScale',
+    'setScrollFactor',
+  ]) {
     text[method] = vi.fn(() => text);
   }
   return text;
@@ -86,6 +95,40 @@ describe('MinimapSystem', () => {
     expect(dynamicGraphics.setScrollFactor).toHaveBeenCalledWith(0);
     expect(staticGraphics.clear).toHaveBeenCalledTimes(1);
     expect(dynamicGraphics.clear).toHaveBeenCalledTimes(2);
+  });
+
+  it('counter-scales and repositions every HUD layer so camera zoom cannot shrink the minimap', () => {
+    const { scene, staticGraphics, dynamicGraphics, dashLabel } = sceneDouble();
+    const minimap = new MinimapSystem(scene as never, {
+      config: GAME_CONFIG.minimap,
+      world,
+      trees: [],
+      shrine: GAME_CONFIG.landmarks.shrine,
+    });
+    const screen = { width: 960, height: 540 };
+    const zoom = GAME_CONFIG.camera.minimumZoom;
+    const inverseZoom = 1 / zoom;
+    const layerX = (screen.width / 2) * (1 - inverseZoom);
+    const layerY = (screen.height / 2) * (1 - inverseZoom);
+    const layout = calculateMinimapLayout(screen, world, GAME_CONFIG.minimap);
+    const labelX = layerX + layout.frame.x * inverseZoom;
+    const labelY =
+      layerY +
+      (layout.frame.y -
+        GAME_CONFIG.minimap.dashBarGap -
+        GAME_CONFIG.minimap.dashBarHeight -
+        GAME_CONFIG.minimap.dashLabelGap) *
+        inverseZoom;
+
+    minimap.initialize(screen);
+    minimap.update([], undefined, { ...camera, zoom }, screen, readyDash);
+
+    expect(staticGraphics.setScale).toHaveBeenLastCalledWith(inverseZoom);
+    expect(dynamicGraphics.setScale).toHaveBeenLastCalledWith(inverseZoom);
+    expect(staticGraphics.setPosition).toHaveBeenLastCalledWith(layerX, layerY);
+    expect(dynamicGraphics.setPosition).toHaveBeenLastCalledWith(layerX, layerY);
+    expect(dashLabel.setScale).toHaveBeenLastCalledWith(inverseZoom);
+    expect(dashLabel.setPosition).toHaveBeenLastCalledWith(labelX, labelY);
   });
 
   it('renders configured trees and shrine on the static layer', () => {
@@ -194,7 +237,9 @@ describe('MinimapSystem', () => {
     minimap.update([newPaper], undefined, camera, { width: 960, height: 540 }, readyDash);
 
     const secondUpdateCalls = (dynamicGraphics.calls as RecordedCall[]).slice(secondUpdateStart);
-    expect(secondUpdateCalls[0]?.method).toBe('clear');
+    expect(secondUpdateCalls.findIndex((call) => call.method === 'clear')).toBeGreaterThanOrEqual(
+      0,
+    );
     expect(secondUpdateCalls.some((call) => call.method === 'fillRect')).toBe(true);
     expect(secondUpdateCalls.some((call) => call.method === 'fillCircle')).toBe(false);
     expect(

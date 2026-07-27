@@ -26,10 +26,16 @@ describe('unit sprite manifest', () => {
       height: 16,
       originX: 8,
       originY: 8,
-      displayScale: 1.5,
-      boundaryRadius: 18,
+      displayScale: 1.7,
+      boundaryRadius: 23,
       filtering: 'nearest',
     });
+  });
+
+  it('gives the slimmer Paper and Scissors silhouettes an explicit readability scale', () => {
+    expect(UNIT_SPRITE_MANIFEST.factions.rock.renderScale).toBe(1);
+    expect(UNIT_SPRITE_MANIFEST.factions.paper.renderScale).toBeGreaterThanOrEqual(1.05);
+    expect(UNIT_SPRITE_MANIFEST.factions.scissors.renderScale).toBeGreaterThanOrEqual(1.1);
   });
 
   it('returns a safe faction fallback and warns in development for a missing frame', () => {

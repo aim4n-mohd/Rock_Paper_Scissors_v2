@@ -42,6 +42,8 @@ function graphicsDouble() {
     'arc',
     'strokePath',
     'setDepth',
+    'setPosition',
+    'setScale',
     'setScrollFactor',
     'setAlpha',
     'destroy',
@@ -59,6 +61,7 @@ function textDouble() {
     'setDepth',
     'setOrigin',
     'setPosition',
+    'setScale',
     'setScrollFactor',
   ]) {
     text[method] = vi.fn(() => text);

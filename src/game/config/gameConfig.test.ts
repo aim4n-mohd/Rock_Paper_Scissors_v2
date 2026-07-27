@@ -66,6 +66,14 @@ describe('game configuration', () => {
       dashLabelGap: 2,
       dashLabelFontSize: 9,
     });
+    expect(GAME_CONFIG.visuals.animation).toMatchObject({
+      playbackByFaction: {
+        rock: { maximumRate: 1.4 },
+        paper: { maximumRate: 1.35 },
+        scissors: { maximumRate: 1.4 },
+      },
+      rockRollPixelsPerRotation: 160,
+    });
     expect(GAME_CONFIG.shrine).toMatchObject({
       enabled: true,
       activationRadius: 90,

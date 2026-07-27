@@ -46,18 +46,23 @@ describe('shared unit animation controller', () => {
     const fast = controller.update(rock, normalContext, 16);
 
     expect(fast.playbackRate).toBeGreaterThan(slow.playbackRate);
+    expect(fast.playbackRate).toBeLessThanOrEqual(1.4);
     expect(fast.rotation).not.toBe(slow.rotation);
+    expect(Math.abs(fast.rotation - slow.rotation)).toBeLessThan(0.15);
   });
 
-  it('points Scissors along velocity and cycles blade frames', () => {
+  it('points Scissors along velocity and cycles blade frames at a readable pace', () => {
     const controller = new UnitAnimationController();
     const scissors = createUnit('scissors', 'scissors', { x: 0, y: 0 });
     scissors.velocity = { x: 0, y: 100 };
     const first = controller.update(scissors, normalContext, 16);
     const second = controller.update(scissors, normalContext, 70);
+    const third = controller.update(scissors, normalContext, 100);
 
     expect(first.rotation).toBeCloseTo(Math.PI / 2);
-    expect(second.frame.id).not.toBe(first.frame.id);
+    expect(second.frame.id).toBe(first.frame.id);
+    expect(third.frame.id).not.toBe(first.frame.id);
+    expect(third.playbackRate).toBeLessThanOrEqual(1.4);
   });
 
   it('uses Paper flutter frames and suppresses nonessential cycling in reduced motion', () => {

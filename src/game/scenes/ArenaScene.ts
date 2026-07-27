@@ -404,11 +404,13 @@ export class ArenaScene extends Phaser.Scene {
           0,
           unit.deathTransitionRemainingMs / GAME_CONFIG.visuals.animation.deathTransitionMs,
         );
+    const spriteDefinition = UNIT_SPRITE_MANIFEST.factions[unit.faction];
+    const visualRadius = UNIT_FRAME_CONTRACT.boundaryRadius;
     if (unit.recruited && unit.alive)
       g.lineStyle(2, 0xffdc62, 0.85).strokeCircle(
         unit.position.x,
         unit.position.y,
-        unit.radius + 5,
+        visualRadius + 2,
       );
     if (unit.recruitEffectRemainingMs > 0 && !this.visualSettings.reducedMotion) {
       const progress =
@@ -416,13 +418,13 @@ export class ArenaScene extends Phaser.Scene {
       g.lineStyle(2, FACTION_COLORS[unit.faction], 1 - progress).strokeCircle(
         unit.position.x,
         unit.position.y,
-        unit.radius + 5 + progress * 13,
+        visualRadius + 2 + progress * 13,
       );
     }
     if (unit.knockbackRemainingMs > 0) {
       const knockbackMagnitude = Math.hypot(unit.knockback.x, unit.knockback.y);
       if (knockbackMagnitude > 0) {
-        const trailLength = unit.radius + 8;
+        const trailLength = visualRadius + 5;
         const trailAlpha = Math.min(
           1,
           unit.knockbackRemainingMs / GAME_CONFIG.combat.knockbackDurationMs,
@@ -453,24 +455,31 @@ export class ArenaScene extends Phaser.Scene {
       : 1 + Math.min(0.06, Math.hypot(unit.velocity.x, unit.velocity.y) / 2500);
     g.fillStyle(0x172216, 0.28 * alpha).fillEllipse(
       unit.position.x + 2,
-      unit.position.y + 8,
-      22 * compression,
-      7,
+      unit.position.y + 10,
+      27 * spriteDefinition.renderScale * compression,
+      8,
     );
     this.drawPixelFrame(
       g,
       unit,
       pose,
-      pose.scaleX * compression * speedStretch,
-      pose.scaleY * compression,
+      pose.scaleX * spriteDefinition.renderScale * compression * speedStretch,
+      pose.scaleY * spriteDefinition.renderScale * compression,
       alpha,
     );
     if (unit.health < unit.maxHealth && unit.alive) {
-      g.fillStyle(0x263024, 0.9).fillRect(unit.position.x - 11, unit.position.y - 18, 22, 3);
+      const healthWidth = 28;
+      const healthY = unit.position.y - visualRadius - 5;
+      g.fillStyle(0x263024, 0.9).fillRect(
+        unit.position.x - healthWidth / 2,
+        healthY,
+        healthWidth,
+        3,
+      );
       g.fillStyle(0xd8e46c, 0.95).fillRect(
-        unit.position.x - 11,
-        unit.position.y - 18,
-        22 * (unit.health / unit.maxHealth),
+        unit.position.x - healthWidth / 2,
+        healthY,
+        healthWidth * (unit.health / unit.maxHealth),
         3,
       );
     }
@@ -678,15 +687,31 @@ export class ArenaScene extends Phaser.Scene {
     color: number,
     alpha: number,
   ): void {
-    g.fillStyle(color, alpha);
     if (faction === 'rock') {
-      g.fillCircle(x, y, size);
+      g.fillStyle(color, alpha)
+        .fillCircle(x, y, size)
+        .fillStyle(0xffffff, alpha * 0.28)
+        .fillCircle(x - size * 0.3, y - size * 0.3, size * 0.28);
     } else if (faction === 'paper') {
-      g.fillRect(x - size, y - size * 1.2, size * 2, size * 2.4);
+      const width = size * 1.7;
+      const height = size * 2.2;
+      g.fillStyle(color, alpha)
+        .fillRect(x - width / 2, y - height / 2, width, height)
+        .lineStyle(Math.max(1, size * 0.2), 0x252820, alpha * 0.75)
+        .strokeRect(x - width / 2, y - height / 2, width, height)
+        .lineBetween(x + width * 0.1, y - height / 2, x + width / 2, y - height * 0.12)
+        .lineBetween(x + width * 0.1, y - height / 2, x + width * 0.1, y - height * 0.12);
     } else {
-      g.lineStyle(Math.max(2, size * 0.55), color, alpha)
-        .lineBetween(x - size, y - size, x + size, y + size)
-        .lineBetween(x + size, y - size, x - size, y + size);
+      const handleX = x - size * 0.55;
+      const handleOffsetY = size * 0.48;
+      const handleRadius = size * 0.32;
+      g.lineStyle(Math.max(1.5, size * 0.32), color, alpha)
+        .strokeCircle(handleX, y - handleOffsetY, handleRadius)
+        .strokeCircle(handleX, y + handleOffsetY, handleRadius)
+        .lineBetween(x - size * 0.22, y - size * 0.2, x + size, y + size * 0.78)
+        .lineBetween(x - size * 0.22, y + size * 0.2, x + size, y - size * 0.78)
+        .fillStyle(color, alpha)
+        .fillCircle(x - size * 0.1, y, Math.max(1.2, size * 0.2));
     }
   }
 }

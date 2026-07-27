@@ -1,10 +1,36 @@
 # Current Phase
 
-Phase 6 - Landing page, match selection, tutorial, settings, pause, and results:
-complete on 2026-07-26 and awaiting UI review.
+Final graphics implementation and camera-independent minimap sizing: complete on
+2026-07-27 and awaiting final gameplay review.
 
 # Baseline
 
+- Pre-change unit and integration baseline: passed - 237 tests across 44 files with
+  `pnpm.cmd test`.
+- Pre-change E2E baseline: passed - 8 serial Chromium tests with
+  `pnpm.cmd test:e2e`.
+- Pre-change type check, lint, formatting, build, and production smoke: passed with
+  `pnpm.cmd typecheck`, `pnpm.cmd lint`, `pnpm.cmd format:check`, `pnpm.cmd build`,
+  and `pnpm.cmd test:production`.
+- Final-graphics red proof: failed as expected - 5 focused assertions demonstrated
+  that camera zoom was not counter-scaled, the old frame contract had no
+  faction-specific readability scale, Rock reached a 2.42x playback rate, and
+  Scissors changed blade frames within 70 ms.
+- Targeted final-graphics tests: passed - 44 tests across 6 minimap, sprite-manifest,
+  animation, configuration, scene-lifecycle, and movement-integration suites.
+- Final unit and integration tests: passed - 239 tests across 44 files with
+  `pnpm.cmd test`.
+- Final E2E tests: passed - 8 serial Chromium tests with `pnpm.cmd test:e2e`.
+- Final type check, lint, and format: passed with `pnpm.cmd typecheck`,
+  `pnpm.cmd lint`, and `pnpm.cmd format:check`.
+- Final build: passed with `pnpm.cmd build`; Vite 5.4.21 transformed 78 modules and
+  emitted 0.63 kB HTML, 10.95 kB CSS, 249.24 kB main JavaScript, and a 1,486.09 kB
+  lazy Phaser/game chunk before gzip.
+- Final production smoke: passed - 1 Chromium test with
+  `pnpm.cmd test:production`.
+- Final manual browser review: passed on Meadow and Forest with Rock, Paper, and
+  Scissors starts. The three silhouettes were distinct at gameplay scale, the new
+  shrine symbols remained readable, and browser diagnostics contained no errors.
 - Pre-Phase 6 unit and integration baseline: passed - 228 tests across 41 files with
   `pnpm.cmd test`. Integration suites run within Vitest.
 - Pre-Phase 6 E2E baseline: passed - 8 serial Chromium tests with
@@ -37,6 +63,30 @@ complete on 2026-07-26 and awaiting UI review.
 
 # Completed
 
+- Locked the minimap, dash bar, and dash label to screen-space geometry by
+  counter-scaling and repositioning all HUD layers against the live world-camera zoom.
+- Added a regression test at the configured maximum zoom-out and retained responsive
+  minimap resizing when the actual screen dimensions change.
+- Centralized faction animation playback ranges, Rock roll distance, and Paper tilt
+  values in the typed visual configuration.
+- Reduced maximum animation playback from the previous 2.8x/2.4x ceilings to
+  1.35x-1.4x and lengthened frame timing for readable pixel motion.
+- Reduced Rock rotation from one turn per roughly 50 pixels to one turn per 160 pixels,
+  retained velocity response, and bounded the accumulated angle.
+- Enlarged the nearest-neighbour unit display contract from 1.5x to 1.7x and added
+  validated per-faction render scales, with extra size reserved for the slimmer Paper
+  and Scissors silhouettes.
+- Rebuilt Paper frames with a heavier dark outline, folded corner, asymmetric flutter,
+  crease, curl, shading, and crumple states.
+- Rebuilt Scissors frames with two visible handle loops, a pivot, thick stepped blades,
+  separated open/closed poses, brighter metal, and a stronger red handle accent.
+- Increased shadows, recruited/recruitment rings, knockback trails, and health-bar
+  clearance to match the larger visual footprint without changing gameplay collision.
+- Replaced the shrine's plain Paper rectangle and Scissors X with a folded sheet glyph
+  and a handled-scissors glyph.
+- Preserved the existing single batched Phaser Graphics renderer, 16x16 typed frame
+  contract, nearest-neighbour configuration, particle cap, gameplay balance, maps,
+  scoring, menus, persistence, and audio scope.
 - Replaced the old single start overlay and temporary development selector with an
   explicit router-free flow: landing, setup, tutorial, match, nested panels, pause,
   results, replay, setup change, and main menu.
@@ -97,6 +147,17 @@ complete on 2026-07-26 and awaiting UI review.
 
 # Decisions and Deviations
 
+- The existing code-authored pixel manifest was refined instead of introducing a new
+  generated bitmap pipeline. This preserves deterministic frames, fallback validation,
+  nearest-neighbour rendering, one batched draw pass, and the established replacement
+  contract.
+- Minimap locking is implemented inside `MinimapSystem`; the dynamic world camera still
+  zooms normally for swarm size, while only the fixed HUD layers receive the exact
+  inverse transform.
+- The larger visual boundary is consumed by existing spawn, world-clamp, and camera
+  containment systems. Gameplay collision radii and balance values were not changed.
+- Existing animation tests were updated only where the requested slower timing
+  deliberately superseded the old 70 ms Scissors-frame expectation.
 - React owns screen navigation and persisted preferences; `Simulation` remains the only
   authority for match time, faction state, scoring, victory, and defeat. No routing
   dependency or duplicate gameplay store was introduced.
@@ -128,6 +189,11 @@ complete on 2026-07-26 and awaiting UI review.
 
 # Manual Review Required
 
+- Play a long match with at least 28 recruited units and confirm the locked minimap
+  footprint feels correct beside the maximum 0.82x camera zoom.
+- Review Rock, Paper, and Scissors while moving and dashing on the preferred display;
+  the implementation is intentionally calmer, but final subjective pacing remains a
+  player-review decision.
 - Review the visual density and copy length of all four setup rows on the target mobile
   devices and preferred desktop resolutions.
 - Play the complete tutorial without using Skip and judge whether each stage needs
@@ -142,5 +208,5 @@ complete on 2026-07-26 and awaiting UI review.
 
 # Next Phase
 
-Stop for Phase 6 UI review. Await explicit direction before beginning Phase 7 audio
-integration.
+Stop for final graphics and gameplay review. Do not begin audio or another release
+phase without explicit direction.
